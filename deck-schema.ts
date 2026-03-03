@@ -18,6 +18,7 @@ export interface DeckSlide {
 	title: string;
 	context?: string;
 	columns?: 1 | 2 | 3;
+	multiSelect?: boolean;
 	options: DeckOption[];
 }
 
@@ -160,6 +161,10 @@ function validateDeckSlide(slide: unknown, index: number): DeckSlide {
 		}
 	}
 
+	if (obj.multiSelect !== undefined && typeof obj.multiSelect !== "boolean") {
+		throw new Error(`Slide "${obj.id}": multiSelect must be a boolean`);
+	}
+
 	if (!Array.isArray(obj.options) || obj.options.length === 0) {
 		throw new Error(`Slide "${obj.id}": options must be a non-empty array`);
 	}
@@ -225,9 +230,11 @@ export function validateDeckConfig(data: unknown): DeckConfig {
 	return obj as unknown as DeckConfig;
 }
 
+export type SelectionValue = string | string[];
+
 export interface SavedDeckData {
 	config: DeckConfig;
-	selections: Record<string, string>;
+	selections: Record<string, SelectionValue>;
 	savedAt: string;
 	id?: string;
 	status?: "submitted" | "in-progress" | "cancelled";
@@ -257,10 +264,14 @@ export function validateSavedDeck(data: unknown): SavedDeckData {
 	const obj = data as Record<string, unknown>;
 	const config = validateDeckConfig(obj.config);
 
-	const selections: Record<string, string> = {};
+	const selections: Record<string, SelectionValue> = {};
 	if (obj.selections && typeof obj.selections === "object" && !Array.isArray(obj.selections)) {
 		for (const [key, val] of Object.entries(obj.selections as Record<string, unknown>)) {
-			if (typeof val === "string") selections[key] = val;
+			if (typeof val === "string") {
+				selections[key] = val;
+			} else if (Array.isArray(val) && val.every((v) => typeof v === "string")) {
+				selections[key] = val as string[];
+			}
 		}
 	}
 

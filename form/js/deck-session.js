@@ -100,7 +100,12 @@ function disableDeckInteractions() {
 
 async function submitDeck() {
 	if (isClosed || isSubmitting) return;
-	const allDone = slides.every((slide) => !!selections[slide.id]);
+	const allDone = slides.every((slide) => {
+		const sel = selections[slide.id];
+		if (!sel) return false;
+		if (Array.isArray(sel) && sel.length === 0) return false;
+		return true;
+	});
 	if (!allDone) {
 		updateSummary();
 		return;
@@ -312,7 +317,7 @@ function insertGeneratedOption(slideId, option, model) {
 	equalizeBlockHeights(slideElement);
 
 	const pick = slideElement.querySelector(".slide-pick");
-	if (pick) pick.innerHTML = optionHint(slide.options.length);
+	if (pick) pick.innerHTML = optionHint(slide.options.length, slide.multiSelect);
 
 	if (current === totalSlides - 1) {
 		updateSummary();
@@ -361,7 +366,7 @@ function replaceSlideOptions(slideId, newOptions) {
 	equalizeBlockHeights(slideElement);
 
 	const pick = slideElement.querySelector(".slide-pick");
-	if (pick) pick.innerHTML = optionHint(newOptions.length);
+	if (pick) pick.innerHTML = optionHint(newOptions.length, slide ? slide.multiSelect : false);
 
 	if (current === totalSlides - 1) {
 		updateSummary();

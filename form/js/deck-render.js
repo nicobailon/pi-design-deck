@@ -137,25 +137,33 @@ function optionCountClass(count, columns) {
 	return "cols-3";
 }
 
-function optionHint(count) {
+function optionHint(count, multiSelect) {
 	const max = Math.min(9, Math.max(1, count));
 	const parts = [];
 	for (let i = 1; i <= max; i += 1) {
 		parts.push(`<kbd>${i}</kbd>`);
 	}
+	if (multiSelect) {
+		return `Choose any (or select all) - press ${parts.join(" ")} or click to toggle`;
+	}
 	return `Choose one - press ${parts.join(" ")} or click`;
 }
 
 function createOptionCard(option, slideId, generatedBy) {
+	const slide = slides.find((s) => s.id === slideId);
+	const isMulti = slide && slide.multiSelect;
 	const card = createElement("div", "option");
-	card.setAttribute("role", "radio");
+	card.setAttribute("role", isMulti ? "checkbox" : "radio");
 	card.setAttribute("aria-checked", "false");
 	card.tabIndex = 0;
 	if (generatedBy !== false) {
 		card.classList.add("option-generated");
 	}
+	if (isMulti) {
+		card.classList.add("option-multi");
+	}
 	card.dataset.value = option.label;
-	card.addEventListener("click", () => selectOption(card));
+	card.addEventListener("click", () => isMulti ? toggleMultiOption(card) : selectOption(card));
 
 	const check = createElement("div", "option-check");
 	check.innerHTML = "&#10003;";
@@ -327,11 +335,23 @@ function renderSlides() {
 		}
 
 		const pick = createElement("p", "slide-pick");
-		pick.innerHTML = optionHint(slide.options.length);
+		pick.innerHTML = optionHint(slide.options.length, slide.multiSelect);
 		section.appendChild(pick);
 
+		if (slide.multiSelect) {
+			const selectAllBar = createElement("div", "select-all-bar");
+			const selectAllBtn = createElement("button", "btn-select-all", "⚡ Select All");
+			selectAllBtn.type = "button";
+			selectAllBtn.dataset.slideId = slide.id;
+			selectAllBtn.addEventListener("click", () => toggleSelectAll(slide.id));
+			selectAllBar.appendChild(selectAllBtn);
+			const selectAllHint = createElement("span", "select-all-hint", "Pick some or all — they'll be composed together");
+			selectAllBar.appendChild(selectAllHint);
+			section.appendChild(selectAllBar);
+		}
+
 		const options = createElement("div", `options ${optionCountClass(slide.options.length, slide.columns)}`);
-		options.setAttribute("role", "radiogroup");
+		options.setAttribute("role", slide.multiSelect ? "group" : "radiogroup");
 		options.setAttribute("aria-label", slide.title);
 		slide.options.forEach((option) => {
 			const card = createOptionCard(option, slide.id, false);
@@ -406,11 +426,24 @@ function createSummaryCard(slide) {
 	const card = createElement("div", "summary-card");
 	card.appendChild(createElement("div", "summary-label", slide.title));
 
-	const selectedLabel = selections[slide.id];
-	card.appendChild(createElement("div", "summary-value", selectedLabel || "-"));
+	const rawSelection = selections[slide.id];
+	const selectedLabel = Array.isArray(rawSelection) ? rawSelection.join(", ") : rawSelection;
+	const isMultiSelected = Array.isArray(rawSelection) && rawSelection.length > 0;
+	
+	if (isMultiSelected) {
+		const valueEl = createElement("div", "summary-value summary-value-multi");
+		rawSelection.forEach((label) => {
+			const tag = createElement("span", "summary-tag", label);
+			valueEl.appendChild(tag);
+		});
+		card.appendChild(valueEl);
+	} else {
+		card.appendChild(createElement("div", "summary-value", selectedLabel || "-"));
+	}
 
-	if (selectedLabel) {
-		const selectedOption = findOption(slide.id, selectedLabel);
+	const firstSelectedLabel = isMultiSelected ? rawSelection[0] : selectedLabel;
+	if (firstSelectedLabel) {
+		const selectedOption = findOption(slide.id, firstSelectedLabel);
 		if (selectedOption) {
 			const previewShell = createElement("div", "summary-preview");
 
@@ -470,7 +503,8 @@ function createSummaryCard(slide) {
 
 		// Show user notes if present
 		const noteData = optionNotes[slide.id];
-		if (noteData && noteData.label === selectedLabel && noteData.notes) {
+		const noteMatches = noteData && (noteData.label === firstSelectedLabel || (isMultiSelected && rawSelection.includes(noteData.label)));
+		if (noteMatches && noteData.notes) {
 			const notesDisplay = createElement("div", "summary-notes");
 			notesDisplay.innerHTML = `<span class="summary-notes-label">Your notes:</span> ${escapeHtml(noteData.notes)}`;
 			card.appendChild(notesDisplay);
@@ -491,7 +525,12 @@ function updateSummary() {
 		summaryGrid.appendChild(createSummaryCard(slide));
 	});
 
-	const missing = slides.filter((slide) => !selections[slide.id]).map((slide) => slide.title);
+	const missing = slides.filter((slide) => {
+		const sel = selections[slide.id];
+		if (!sel) return true;
+		if (Array.isArray(sel) && sel.length === 0) return true;
+		return false;
+	}).map((slide) => slide.title);
 	const allDone = missing.length === 0;
 
 	summaryDesc.textContent = allDone

@@ -19,7 +19,7 @@ import {
 	validateTokenQuery,
 	type SessionEntry,
 } from "./server-utils.js";
-import { isDeckOption, type DeckConfig, type DeckOption, type PreviewBlock } from "./deck-schema.js";
+import { isDeckOption, type DeckConfig, type DeckOption, type PreviewBlock, type SelectionValue } from "./deck-schema.js";
 import { saveGenerateModel } from "./settings.js";
 
 export interface ModelInfo {
@@ -82,6 +82,23 @@ function toStringMap(value: unknown): Record<string, string> | null {
 	return out;
 }
 
+function toSelectionsMap(value: unknown): Record<string, SelectionValue> | null {
+	if (!value || typeof value !== "object" || Array.isArray(value)) {
+		return null;
+	}
+	const out: Record<string, SelectionValue> = {};
+	for (const [key, entry] of Object.entries(value as Record<string, unknown>)) {
+		if (typeof entry === "string") {
+			out[key] = entry;
+		} else if (Array.isArray(entry) && entry.every((v) => typeof v === "string")) {
+			out[key] = entry as string[];
+		} else {
+			return null;
+		}
+	}
+	return out;
+}
+
 function registerAsset(filePath: string, assetsDir: string): string {
 	if (!existsSync(filePath)) throw new Error(`Image not found: ${filePath}`);
 	const ext = extname(filePath);
@@ -112,7 +129,7 @@ function sanitizeForFilename(value: string): string {
 
 function saveDeckSnapshot(
 	config: DeckConfig,
-	selections: Record<string, string>,
+	selections: Record<string, SelectionValue>,
 	assetsDir: string,
 	normalizedCwd: string,
 	gitBranch: string | null,
@@ -188,7 +205,7 @@ export interface DeckServerOptions {
 	cwd: string;
 	port?: number;
 	theme?: { mode?: string; toggleHotkey?: string };
-	savedSelections?: Record<string, string>;
+	savedSelections?: Record<string, SelectionValue>;
 	savedNotes?: Record<string, { label: string; notes: string }>;
 	savedFinalNotes?: string;
 	snapshotDir?: string;
@@ -197,7 +214,7 @@ export interface DeckServerOptions {
 }
 
 export interface DeckServerCallbacks {
-	onSubmit: (selections: Record<string, string>, notes?: Record<string, string>, finalNotes?: string) => void;
+	onSubmit: (selections: Record<string, SelectionValue>, notes?: Record<string, string>, finalNotes?: string) => void;
 	onCancel: (reason?: "user" | "stale" | "aborted") => void;
 	onGenerateMore: (slideId: string, prompt?: string, model?: string, thinking?: string, count?: number) => void;
 	onRegenerateSlide: (slideId: string, prompt?: string, model?: string, thinking?: string) => void;
@@ -453,7 +470,7 @@ export async function startDeckServer(
 				}
 
 				const payload = body as { selections?: unknown; notes?: unknown; finalNotes?: unknown };
-				const selections = toStringMap(payload.selections);
+				const selections = toSelectionsMap(payload.selections);
 				if (!selections) {
 					sendJson(res, 400, { ok: false, error: "Invalid selections payload" });
 					return;
@@ -489,7 +506,7 @@ export async function startDeckServer(
 				}
 
 				const payload = body as { selections?: unknown; notes?: unknown; finalNotes?: unknown };
-				const selections = toStringMap(payload.selections) ?? {};
+				const selections = toSelectionsMap(payload.selections) ?? {};
 				const notes = toStringMap(payload.notes) ?? undefined;
 				const finalNotes = typeof payload.finalNotes === "string" ? payload.finalNotes.trim() : undefined;
 
@@ -522,7 +539,7 @@ export async function startDeckServer(
 						? payload.reason
 						: "user";
 
-				const cancelSelections = toStringMap(payload.selections);
+				const cancelSelections = toSelectionsMap(payload.selections);
 				if (cancelSelections && Object.keys(cancelSelections).length > 0) {
 					try {
 						saveDeckSnapshot(config, cancelSelections, assetsDir, normalizedCwd, gitBranch, sessionId, snapshotDir || DECK_SNAPSHOTS_DIR, {

@@ -291,6 +291,42 @@ describe("validateDeckConfig", () => {
 		});
 	});
 
+	describe("multiSelect", () => {
+		it("accepts multiSelect: true", () => {
+			const config = validateDeckConfig({
+				slides: [{
+					id: "s1", title: "T", multiSelect: true,
+					options: [{ label: "A", previewHtml: "<div>A</div>" }, { label: "B", previewHtml: "<div>B</div>" }],
+				}],
+			});
+			expect(config.slides[0].multiSelect).toBe(true);
+		});
+
+		it("accepts multiSelect: false", () => {
+			const config = validateDeckConfig({
+				slides: [{
+					id: "s1", title: "T", multiSelect: false,
+					options: [{ label: "A", previewHtml: "<div>A</div>" }],
+				}],
+			});
+			expect(config.slides[0].multiSelect).toBe(false);
+		});
+
+		it("accepts omitted multiSelect (defaults to undefined)", () => {
+			const config = validateDeckConfig(validDeck());
+			expect(config.slides[0].multiSelect).toBeUndefined();
+		});
+
+		it("rejects non-boolean multiSelect", () => {
+			expect(() => validateDeckConfig({
+				slides: [{
+					id: "s1", title: "T", multiSelect: "yes",
+					options: [{ label: "A", previewHtml: "<div>A</div>" }],
+				}],
+			})).toThrow("multiSelect must be a boolean");
+		});
+	});
+
 	describe("reserved ids", () => {
 		it('rejects slide id "summary"', () => {
 			expect(() => validateDeckConfig({
@@ -393,6 +429,21 @@ describe("validateSavedDeck", () => {
 	it("filters non-string selection values", () => {
 		const result = validateSavedDeck({ config: minConfig, selections: { s1: "A", s2: 42 } });
 		expect(result.selections).toEqual({ s1: "A" });
+	});
+
+	it("accepts array selections for multi-select slides", () => {
+		const result = validateSavedDeck({ config: minConfig, selections: { s1: ["A", "B"] } });
+		expect(result.selections).toEqual({ s1: ["A", "B"] });
+	});
+
+	it("accepts mixed string and array selections", () => {
+		const result = validateSavedDeck({ config: minConfig, selections: { s1: "A", s2: ["B", "C"] } });
+		expect(result.selections).toEqual({ s1: "A", s2: ["B", "C"] });
+	});
+
+	it("filters arrays with non-string elements", () => {
+		const result = validateSavedDeck({ config: minConfig, selections: { s1: ["A", 42] } });
+		expect(result.selections).toEqual({});
 	});
 
 	it("provides default savedAt when missing", () => {

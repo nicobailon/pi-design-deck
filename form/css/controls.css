@@ -510,3 +510,75 @@
 
 [data-theme="light"] .option:hover { box-shadow: 0 4px 16px -4px rgba(0,0,0,0.1); }
 [data-theme="light"] .summary-card:hover { box-shadow: 0 4px 12px -4px rgba(0,0,0,0.06); }
+
+/* ─────────────────────────────────────────────────────────────
+   MULTI-SELECT & SELECT ALL
+   ───────────────────────────────────────────────────────────── */
+
+.select-all-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding: 0 2px;
+}
+
+.btn-select-all {
+  background: var(--dk-surface-2);
+  color: var(--dk-text-primary);
+  border: 1px solid var(--dk-border);
+  border-radius: 6px;
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.btn-select-all:hover {
+  background: var(--dk-accent);
+  color: var(--dk-accent-text, #fff);
+  border-color: var(--dk-accent);
+}
+
+.btn-select-all.all-selected {
+  background: var(--dk-status-success, #22c55e);
+  color: #fff;
+  border-color: var(--dk-status-success, #22c55e);
+}
+
+.select-all-hint {
+  font-size: 12px;
+  color: var(--dk-text-secondary);
+  opacity: 0.7;
+}
+
+/* Multi-select checkbox indicator */
+.option-multi .option-radio {
+  border-radius: 4px;
+}
+
+.option-multi.selected .option-radio {
+  border-radius: 4px;
+}
+
+/* Summary tags for multi-select */
+.summary-value-multi {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.summary-tag {
+  background: var(--dk-surface-2);
+  border: 1px solid var(--dk-border);
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 12px;
+  color: var(--dk-text-primary);
+}
+
+[data-theme="light"] .btn-select-all { background: #f0f0f0; border-color: #d0d0d0; }
+[data-theme="light"] .btn-select-all:hover { background: var(--dk-accent); color: #fff; }
+[data-theme="light"] .summary-tag { background: #f5f5f5; border-color: #e0e0e0; }

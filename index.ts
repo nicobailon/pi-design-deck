@@ -7,7 +7,7 @@ import * as fs from "node:fs";
 import { randomUUID } from "node:crypto";
 import { loadSettings } from "./settings.js";
 import { getDefaultSnapshotDir, startDeckServer, type DeckServerHandle, type ModelInfo } from "./deck-server.js";
-import { deriveDeckStatusFromFolderName, isDeckOption, validateDeckConfig, validateSavedDeck, type SavedDeckData, type SavedDeckStatus } from "./deck-schema.js";
+import { deriveDeckStatusFromFolderName, isDeckOption, validateDeckConfig, validateSavedDeck, type SavedDeckData, type SavedDeckStatus, type SelectionValue } from "./deck-schema.js";
 import { buildGenerateMoreResult, buildRegenerateResult } from "./generate-prompts.js";
 import { generateWithModel } from "./model-runner.js";
 import { buildStandaloneDeckHtml } from "./export-html.js";
@@ -42,7 +42,7 @@ async function openUrl(pi: ExtensionAPI, url: string, browser?: string): Promise
 interface DeckDetails {
 	status: "completed" | "cancelled" | "generate-more" | "aborted" | "error";
 	url: string;
-	selections?: Record<string, string>;
+	selections?: Record<string, SelectionValue>;
 	notes?: Record<string, string>;
 	finalNotes?: string;
 	slideId?: string;
@@ -88,10 +88,11 @@ const DeckParams = Type.Object(
 		slides: Type.Optional(
 			Type.String({
 				description:
-					"JSON string of deck config. Each slide has id, title, context?, columns? (1|2|3, omit for auto-layout), and options[]. " +
+					"JSON string of deck config. Each slide has id, title, context?, columns? (1|2|3, omit for auto-layout), multiSelect? (boolean, enables checkbox selection + Select All), and options[]. " +
 					"Each option has label, description?, aside?, recommended?, and either previewHtml (raw HTML string) or " +
 					"previewBlocks (array of typed blocks: {type:'html',content}, {type:'mermaid',content,theme?}, " +
-					"{type:'code',code,lang}, {type:'image',src,alt,caption?}). Exactly one of previewHtml or previewBlocks required per option.",
+					"{type:'code',code,lang}, {type:'image',src,alt,caption?}). Exactly one of previewHtml or previewBlocks required per option. " +
+					"When multiSelect is true, users can select multiple options or use 'Select All'. Selections are returned as arrays.",
 			})
 		),
 		action: Type.Optional(
@@ -313,15 +314,16 @@ function attachDeckAbortHandler(signal: AbortSignal | undefined): void {
 	signal.addEventListener("abort", abortHandler, { once: true });
 }
 
-function formatDeckSelections(selections: Record<string, string>, notes?: Record<string, string>): string {
+function formatDeckSelections(selections: Record<string, SelectionValue>, notes?: Record<string, string>): string {
 	const entries = Object.entries(selections);
 	if (entries.length === 0) return "(none)";
 	return entries.map(([key, value]) => {
+		const displayValue = Array.isArray(value) ? value.join(", ") : value;
 		const note = notes?.[key];
 		if (note) {
-			return `- ${key}: ${value}\n  Notes: ${note}`;
+			return `- ${key}: ${displayValue}\n  Notes: ${note}`;
 		}
-		return `- ${key}: ${value}`;
+		return `- ${key}: ${displayValue}`;
 	}).join("\n");
 }
 
@@ -743,7 +745,7 @@ export default function (pi: ExtensionAPI) {
 				};
 			}
 
-			const handleSubmit = (selections: Record<string, string>, notes?: Record<string, string>, finalNotes?: string) => {
+			const handleSubmit = (selections: Record<string, SelectionValue>, notes?: Record<string, string>, finalNotes?: string) => {
 				if (!activeDeckServer) return;
 				const url = activeDeckServer.handle.url;
 				const hasNotes = notes && Object.keys(notes).length > 0;

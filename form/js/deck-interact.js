@@ -5,13 +5,25 @@ function applySavedSelections(savedSelections, savedNotes) {
 	isRestoringSelections = true;
 	try {
 		for (const [slideId, label] of Object.entries(savedSelections)) {
-			if (typeof label !== "string") continue;
 			const slideEl = document.querySelector(`.slide[data-id="${CSS.escape(slideId)}"]`);
 			if (!slideEl) continue;
-			for (const card of slideEl.querySelectorAll(".option")) {
-				if (card.dataset.value === label) {
-					selectOption(card);
-					break;
+			
+			if (Array.isArray(label)) {
+				// Multi-select restoration
+				selections[slideId] = [...label];
+				for (const card of slideEl.querySelectorAll(".option")) {
+					if (label.includes(card.dataset.value)) {
+						card.classList.add("selected");
+						card.setAttribute("aria-checked", "true");
+					}
+				}
+				syncSelectAllButton(slideId);
+			} else if (typeof label === "string") {
+				for (const card of slideEl.querySelectorAll(".option")) {
+					if (card.dataset.value === label) {
+						selectOption(card);
+						break;
+					}
 				}
 			}
 		}
@@ -81,6 +93,83 @@ function selectOption(optionElement) {
 		saveSelectionsToStorage();
 		markDirty();
 	}
+}
+
+function toggleMultiOption(optionElement) {
+	if (isClosed) return;
+	const slideElement = optionElement.closest(".slide");
+	if (!slideElement) return;
+	const slideId = slideElement.dataset.id;
+	if (!slideId || slideId === "summary") return;
+	const value = optionElement.dataset.value || "";
+
+	// Ensure selections[slideId] is an array for multi-select
+	if (!Array.isArray(selections[slideId])) {
+		selections[slideId] = [];
+	}
+	const arr = selections[slideId];
+	const idx = arr.indexOf(value);
+	if (idx >= 0) {
+		arr.splice(idx, 1);
+		optionElement.classList.remove("selected");
+		optionElement.setAttribute("aria-checked", "false");
+	} else {
+		arr.push(value);
+		optionElement.classList.add("selected");
+		optionElement.setAttribute("aria-checked", "true");
+	}
+
+	// Update select-all button state
+	syncSelectAllButton(slideId);
+
+	if (!isRestoringSelections) {
+		saveSelectionsToStorage();
+		markDirty();
+	}
+}
+
+function toggleSelectAll(slideId) {
+	if (isClosed) return;
+	const slideElement = document.querySelector(`.slide[data-id="${CSS.escape(slideId)}"]`);
+	if (!slideElement) return;
+	const slide = slides.find((s) => s.id === slideId);
+	if (!slide) return;
+
+	const allLabels = slide.options.map((o) => o.label);
+	const currentArr = Array.isArray(selections[slideId]) ? selections[slideId] : [];
+	const allSelected = allLabels.length > 0 && allLabels.every((l) => currentArr.includes(l));
+
+	if (allSelected) {
+		// Deselect all
+		selections[slideId] = [];
+		slideElement.querySelectorAll(".option").forEach((card) => {
+			card.classList.remove("selected");
+			card.setAttribute("aria-checked", "false");
+		});
+	} else {
+		// Select all
+		selections[slideId] = [...allLabels];
+		slideElement.querySelectorAll(".option").forEach((card) => {
+			card.classList.add("selected");
+			card.setAttribute("aria-checked", "true");
+		});
+	}
+
+	syncSelectAllButton(slideId);
+	saveSelectionsToStorage();
+	markDirty();
+}
+
+function syncSelectAllButton(slideId) {
+	const btn = document.querySelector(`.btn-select-all[data-slide-id="${CSS.escape(slideId)}"]`);
+	if (!btn) return;
+	const slide = slides.find((s) => s.id === slideId);
+	if (!slide) return;
+	const allLabels = slide.options.map((o) => o.label);
+	const currentArr = Array.isArray(selections[slideId]) ? selections[slideId] : [];
+	const allSelected = allLabels.length > 0 && allLabels.every((l) => currentArr.includes(l));
+	btn.textContent = allSelected ? "✓ All Selected" : "⚡ Select All";
+	btn.classList.toggle("all-selected", allSelected);
 }
 
 // ─── NAVIGATION ──────────────────────────────────────────────
@@ -182,7 +271,11 @@ function handleKeydown(event) {
 		const focused = document.activeElement;
 		if (focused && focused.classList.contains("option")) {
 			event.preventDefault();
-			selectOption(focused);
+			if (focused.classList.contains("option-multi")) {
+				toggleMultiOption(focused);
+			} else {
+				selectOption(focused);
+			}
 			return;
 		}
 	}
@@ -191,7 +284,11 @@ function handleKeydown(event) {
 		const focused = document.activeElement;
 		if (focused && focused.classList.contains("option")) {
 			event.preventDefault();
-			selectOption(focused);
+			if (focused.classList.contains("option-multi")) {
+				toggleMultiOption(focused);
+			} else {
+				selectOption(focused);
+			}
 			return;
 		}
 		if (focused && focused.tagName === "BUTTON") {
@@ -222,7 +319,11 @@ function handleKeydown(event) {
 	const target = options[num - 1];
 	if (target) {
 		event.preventDefault();
-		selectOption(target);
+		if (target.classList.contains("option-multi")) {
+			toggleMultiOption(target);
+		} else {
+			selectOption(target);
+		}
 	}
 }
 
