@@ -78,7 +78,7 @@ interface SavedDeckListItem {
 
 interface LoadedDeckSource {
 	configData: unknown;
-	savedSelections?: Record<string, string>;
+	savedSelections?: Record<string, SelectionValue>;
 	savedNotes?: Record<string, { label: string; notes: string }>;
 	savedFinalNotes?: string;
 }
@@ -196,7 +196,9 @@ function resolveDeckFilePath(snapshotDir: string, deckId: string): string | null
 function buildSavedNotesForClient(saved: SavedDeckData): Record<string, { label: string; notes: string }> | undefined {
 	const savedNotesForClient: Record<string, { label: string; notes: string }> = {};
 	for (const [slideId, noteString] of Object.entries(saved.notes ?? {})) {
-		const label = saved.selections[slideId];
+		const selection = saved.selections[slideId];
+		// For multi-select, use the first selected label for note association
+		const label = Array.isArray(selection) ? selection[0] : selection;
 		if (label && noteString) {
 			savedNotesForClient[slideId] = { label, notes: noteString };
 		}
@@ -717,7 +719,7 @@ export default function (pi: ExtensionAPI) {
 			}
 
 			let configData: unknown;
-			let savedSelections: Record<string, string> | undefined;
+			let savedSelections: Record<string, SelectionValue> | undefined;
 			let savedNotes: Record<string, { label: string; notes: string }> | undefined;
 			let savedFinalNotes: string | undefined;
 			try {

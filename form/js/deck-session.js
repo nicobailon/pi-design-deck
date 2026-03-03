@@ -289,12 +289,23 @@ function restoreGenerateButton(slideId) {
 function reapplySelectionAfterInsert(slideElement, slideId) {
 	const selected = selections[slideId];
 	if (!selected) return;
-	const selectedEl = Array.from(slideElement.querySelectorAll(".option")).find(
-		(el) => el.dataset.value === selected
-	);
-	if (selectedEl) {
-		selectedEl.classList.add("selected");
-		selectedEl.setAttribute("aria-checked", "true");
+	if (Array.isArray(selected)) {
+		// Multi-select: re-apply all selected options
+		for (const card of slideElement.querySelectorAll(".option")) {
+			if (selected.includes(card.dataset.value)) {
+				card.classList.add("selected");
+				card.setAttribute("aria-checked", "true");
+			}
+		}
+		syncSelectAllButton(slideId);
+	} else {
+		const selectedEl = Array.from(slideElement.querySelectorAll(".option")).find(
+			(el) => el.dataset.value === selected
+		);
+		if (selectedEl) {
+			selectedEl.classList.add("selected");
+			selectedEl.setAttribute("aria-checked", "true");
+		}
 	}
 }
 

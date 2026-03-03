@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { basename, dirname, extname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { deriveDeckStatusFromFolderName, type DeckOption, type DeckSlide, type PreviewBlock, type SavedDeckData } from "./deck-schema.js";
+import { deriveDeckStatusFromFolderName, type DeckOption, type DeckSlide, type PreviewBlock, type SavedDeckData, type SelectionValue } from "./deck-schema.js";
 
 const FORM_DIR = join(dirname(fileURLToPath(import.meta.url)), "form");
 const CSS_FILES = ["variables", "layout", "preview", "controls"];
@@ -207,8 +207,8 @@ function renderPreviewBlocks(blocks: PreviewBlock[], baseDir: string): string {
 	}).join("");
 }
 
-function renderOption(option: DeckOption, slideId: string, selectedLabel: string | undefined, note: string | undefined, baseDir: string): string {
-	const isSelected = selectedLabel === option.label;
+function renderOption(option: DeckOption, slideId: string, selectedLabel: SelectionValue | undefined, note: string | undefined, baseDir: string): string {
+	const isSelected = Array.isArray(selectedLabel) ? selectedLabel.includes(option.label) : selectedLabel === option.label;
 	const previewContent = Array.isArray(option.previewBlocks) && option.previewBlocks.length > 0
 		? renderPreviewBlocks(option.previewBlocks, baseDir)
 		: option.previewHtml || "";
