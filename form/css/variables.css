@@ -1,54 +1,77 @@
 /**
  * variables.css
- * Theme tokens for dark and light modes
+ * Theme tokens for dark and light modes — Helios Identity palette (Domain 0)
  */
 
 :root {
-  --dk-font: 'Outfit', system-ui, -apple-system, sans-serif;
+  --dk-font: 'IBM Plex Sans', system-ui, sans-serif;
   --dk-font-mono: 'Space Mono', 'SF Mono', Consolas, monospace;
-  --dk-accent: #8abeb7;
+  --dk-accent: #22D3EE;
+  --dk-accent-rgb: 34,211,238;
 
-  --dk-ink: 255,255,255;
-  --dk-bg: #18181e;
-  --dk-glow: rgba(138,190,183,0.06);
-  --dk-surface: #1e1e24;
-  --dk-surface-shimmer: #262630;
-  --dk-elevated: #252530;
-  --dk-elevated-hover: #2b2b37;
-  --dk-text: #b0b0b0;
-  --dk-text-strong: #e0e0e0;
-  --dk-text-label: #c8c8c8;
-  --dk-text-secondary: #808080;
-  --dk-text-aside: #888888;
-  --dk-text-hint: #666666;
-  --dk-text-dim: #555555;
-  --dk-text-placeholder: #404040;
-  --dk-accent-text: #9dcec7;
-  --dk-status-success: #34d399;
-  --dk-status-warn: #f0c674;
+  --dk-ink: 240,253,255; /* Must stay as R,G,B triplet — used inside rgba() */
+  --dk-bg: #020914;
+  --dk-glow: rgba(34,211,238,0.06);
+  --dk-surface: #040C18;
+  --dk-surface-2: #070f1e;
+  --dk-surface-shimmer: #0a1220;
+  --dk-elevated: #050D1E;
+  --dk-elevated-hover: #0a1628;
+  --dk-text: #c8dae8;
+  --dk-text-strong: #F0FDFF;
+  --dk-text-label: #F0FDFF;
+  --dk-text-secondary: #7A8BA0;
+  --dk-text-aside: #7A8BA0;
+  --dk-text-hint: #5a7a9a;
+  --dk-text-dim: #6b8aab;
+  --dk-text-placeholder: #2a4a6a;
+  --dk-text-primary: var(--dk-text-label);
+  --dk-accent-text: #22D3EE;
+  --dk-accent-on: #020914;
+  --dk-status-success: #22C55E;
+  --dk-status-warn: #F59E0B;
   --dk-status-error: #f87171;
-  --dk-overlay: rgba(24,24,30,0.95);
+  --dk-status-warn-rgb: 245,158,11;
+  --dk-status-success-rgb: 34,197,94;
+  --dk-status-error-rgb: 248,113,113;
+  --dk-overlay: rgba(2,9,20,0.95);
+  --dk-border: rgba(var(--dk-ink), 0.12);
+  --dk-border-subtle: rgba(var(--dk-ink), 0.06);
+  --dk-border-strong: rgba(var(--dk-ink), 0.18);
+  --dk-border-focus: rgba(34,211,238,0.4);
 }
 
 [data-theme="light"] {
-  --dk-ink: 0,0,0;
-  --dk-bg: #f8f8f8;
-  --dk-glow: rgba(95,135,135,0.08);
+  --dk-ink: 2,9,20; /* Must stay as R,G,B triplet — used inside rgba() */
+  --dk-accent: #0E7490;
+  --dk-accent-rgb: 14,116,144;
+  --dk-bg: #f0f4f8;
+  --dk-glow: rgba(14,116,144,0.06);
   --dk-surface: #ffffff;
-  --dk-surface-shimmer: #ececec;
-  --dk-elevated: #f0f0f0;
-  --dk-elevated-hover: #e8e8e8;
-  --dk-text: #6c6c6c;
-  --dk-text-strong: #1a1a1a;
-  --dk-text-label: #3a3a3a;
-  --dk-text-secondary: #808080;
-  --dk-text-aside: #7a7a7a;
-  --dk-text-hint: #8a8a8a;
-  --dk-text-dim: #a0a0a0;
-  --dk-text-placeholder: #c8c8c8;
-  --dk-accent-text: #4a7a73;
-  --dk-status-success: #059669;
+  --dk-surface-2: #e4eaf0;
+  --dk-surface-shimmer: #e8eef4;
+  --dk-elevated: #eaf0f6;
+  --dk-elevated-hover: #dce6f0;
+  --dk-text: #4a5a6a;
+  --dk-text-strong: #020914;
+  --dk-text-label: #0a1628;
+  --dk-text-secondary: #5a6a7a;
+  --dk-text-aside: #6a7a8a;
+  --dk-text-hint: #7a8a9a;
+  --dk-text-dim: #667788;
+  --dk-text-placeholder: #aabaca;
+  --dk-text-primary: var(--dk-text-label);
+  --dk-accent-text: #0E7490;
+  --dk-accent-on: #ffffff;
+  --dk-status-success: #16a34a;
   --dk-status-warn: #d97706;
-  --dk-status-error: #af5f5f;
-  --dk-overlay: rgba(255,255,255,0.95);
+  --dk-status-error: #dc2626;
+  --dk-status-warn-rgb: 217,119,6;
+  --dk-status-success-rgb: 22,163,74;
+  --dk-status-error-rgb: 220,38,38;
+  --dk-overlay: rgba(240,244,248,0.95);
+  --dk-border: rgba(var(--dk-ink), 0.12);
+  --dk-border-subtle: rgba(var(--dk-ink), 0.06);
+  --dk-border-strong: rgba(var(--dk-ink), 0.18);
+  --dk-border-focus: rgba(14,116,144,0.4);
 }
