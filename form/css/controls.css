@@ -579,6 +579,10 @@
   .options.cols-3 { grid-template-columns: repeat(2, 1fr); }
 }
 
+@media (max-width: 1100px) {
+  .deck-key { display: none; }
+}
+
 @media (max-width: 900px) {
   .options.cols-3 { grid-template-columns: 1fr; }
   .options.cols-2 { grid-template-columns: 1fr; }
@@ -586,6 +590,12 @@
   .summary-grid { grid-template-columns: 1fr; }
   .pv-layout-sidebar { grid-template-columns: 120px 1fr; }
   .deck-save-status { display: none; }
+  .deck-footer { padding: 10px 16px; }
+}
+
+@media (max-width: 600px) {
+  .layout-toggle { display: none; }
+  .deck-header { padding: 0 16px; }
 }
 
 /* ─────────────────────────────────────────────────────────────

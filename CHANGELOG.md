@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.3.3] - 2026-03-15
+
+### Added
+- **Glimpse integration on macOS**: New deck sessions now open in a native Glimpse window when `glimpseui` is available.
+
+### Fixed
+- **Responsive footer**: Nav buttons no longer wrap text or squish at narrow widths. Keyboard hints hide below 1100px, layout toggle hides below 600px, footer padding tightens on mobile.
+
+### Changed
+- **Graceful launch fallback**: When Glimpse is unavailable or fails to open, deck startup falls back to the existing browser launch flow.
+- **Window lifecycle cleanup**: Deck cleanup paths now close the active Glimpse window so submit/cancel/abort/shutdown flows do not leave orphan native windows.
+
 ## [0.3.2] - 2026-03-11
 
 ### Fixed

@@ -5,12 +5,23 @@ import * as path from "node:path";
 import * as os from "node:os";
 import * as fs from "node:fs";
 import { randomUUID } from "node:crypto";
+import { execFileSync } from "node:child_process";
+import { createRequire } from "node:module";
 import { loadSettings } from "./settings.js";
 import { getDefaultSnapshotDir, startDeckServer, type DeckServerHandle, type ModelInfo } from "./deck-server.js";
 import { deriveDeckStatusFromFolderName, isDeckOption, validateDeckConfig, validateSavedDeck, type SavedDeckData, type SavedDeckStatus } from "./deck-schema.js";
 import { buildGenerateMoreResult, buildRegenerateResult } from "./generate-prompts.js";
 import { generateWithModel } from "./model-runner.js";
 import { buildStandaloneDeckHtml } from "./export-html.js";
+
+interface GlimpseWindow {
+	on(event: "closed", handler: () => void): void;
+	on(event: "error", handler: (err: Error) => void): void;
+	close(): void;
+}
+
+let glimpseOpen: ((html: string, opts: Record<string, unknown>) => GlimpseWindow) | null | undefined;
+let activeGlimpseWin: GlimpseWindow | null = null;
 
 async function openUrl(pi: ExtensionAPI, url: string, browser?: string): Promise<void> {
 	const platform = os.platform();
@@ -144,6 +155,68 @@ function resolveSnapshotDir(snapshotDir?: string): string {
 	return snapshotDir ? expandHome(snapshotDir) : getDefaultSnapshotDir();
 }
 
+function escapeHtml(str: string): string {
+	return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+function findGlimpseMjs(): string | null {
+	// Local node_modules
+	try {
+		const req = createRequire(import.meta.url);
+		return req.resolve("glimpseui");
+	} catch {}
+	// Global npm install
+	try {
+		const globalRoot = execFileSync("npm", ["root", "-g"], { encoding: "utf-8" }).trim();
+		const entry = path.join(globalRoot, "glimpseui", "src", "glimpse.mjs");
+		if (fs.existsSync(entry)) return entry;
+	} catch {}
+	return null;
+}
+
+async function getGlimpseOpen() {
+	if (glimpseOpen !== undefined) return glimpseOpen;
+	const resolved = findGlimpseMjs();
+	if (resolved) {
+		try {
+			glimpseOpen = (await import(resolved)).open;
+			return glimpseOpen;
+		} catch {}
+	}
+	glimpseOpen = null;
+	return glimpseOpen;
+}
+
+function openInGlimpse(
+	open: (html: string, opts: Record<string, unknown>) => GlimpseWindow,
+	url: string,
+	title?: string,
+): GlimpseWindow {
+	const safeTitle = escapeHtml(title || "Design Deck");
+	const shellHtml = `<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>${safeTitle}</title></head>
+<body style="margin:0; background:#18181e;">
+  <script>window.location.replace(${JSON.stringify(url)});</script>
+</body>
+</html>`;
+
+	return open(shellHtml, {
+		width: 1100,
+		height: 800,
+		title: title || "Design Deck",
+	});
+}
+
+function closeActiveGlimpseWindow(): void {
+	if (!activeGlimpseWin) return;
+	const win = activeGlimpseWin;
+	activeGlimpseWin = null;
+	try {
+		win.close();
+	} catch {}
+}
+
 function listSavedDecks(snapshotDir: string): { decks: SavedDeckListItem[]; warnings: string[] } {
 	if (!fs.existsSync(snapshotDir)) {
 		return { decks: [], warnings: [] };
@@ -253,6 +326,7 @@ function cleanupActiveDeck(reason?: string): void {
 		restoreDeckThinking();
 		restoreDeckThinking = null;
 	}
+	closeActiveGlimpseWindow();
 	if (!activeDeckServer) return;
 	try {
 		activeDeckServer.handle.close(reason);
@@ -332,6 +406,7 @@ export default function (pi: ExtensionAPI) {
 		label: "Design Deck",
 		description:
 			"Present a multi-slide design deck with visual options for decisions. " +
+			"On macOS, opens in a native window (Glimpse); falls back to a browser tab elsewhere. " +
 			"Slides JSON: { title?, slides: [{ id, title, context?, columns?, options }] }. " +
 			"When the user requests more options, tool returns generate-more instructions — " +
 			'call design_deck with action:"add-options" to push all new options at once. ' +
@@ -889,12 +964,28 @@ export default function (pi: ExtensionAPI) {
 				});
 			}
 
-			try {
-				await openUrl(pi, serverHandle.url, settings.browser);
-			} catch (err) {
-				cleanupActiveDeck();
-				const message = err instanceof Error ? err.message : String(err);
-				throw new Error(`Failed to open browser: ${message}`);
+			const glimpseOpenFn = os.platform() === "darwin" ? await getGlimpseOpen() : null;
+			if (glimpseOpenFn) {
+				try {
+					const thisWindow = openInGlimpse(glimpseOpenFn, serverHandle.url, config.title || "Design Deck");
+					activeGlimpseWin = thisWindow;
+					thisWindow.on("error", () => {});
+					thisWindow.on("closed", () => {
+						if (activeGlimpseWin !== thisWindow) return;
+						activeGlimpseWin = null;
+						handleCancel("user");
+					});
+				} catch {}
+			}
+
+			if (!activeGlimpseWin) {
+				try {
+					await openUrl(pi, serverHandle.url, settings.browser);
+				} catch (err) {
+					cleanupActiveDeck();
+					const message = err instanceof Error ? err.message : String(err);
+					throw new Error(`Failed to open browser: ${message}`);
+				}
 			}
 
 			return blockOnDeck();

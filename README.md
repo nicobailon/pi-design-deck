@@ -41,6 +41,7 @@ Restart pi to load the extension and the bundled `design-deck` skill.
 
 **Requirements:**
 - pi-agent v0.35.0 or later (extensions API)
+- Optional on macOS: `glimpseui` for native window launch (`npm install -g glimpseui`)
 
 https://github.com/user-attachments/assets/aff1bac6-8bc2-461a-8828-f588ce655f7f
 
@@ -110,7 +111,7 @@ The browser opens, the user picks "JWT + Refresh Tokens", and the agent receives
 
 ## How It Works
 
-1. Agent calls `design_deck()` with slides JSON — local HTTP server starts, browser opens
+1. Agent calls `design_deck()` with slides JSON — local HTTP server starts, opens in Glimpse on macOS when available, otherwise opens in the browser
 2. User navigates slides, picks one option per slide
 3. Optionally clicks "Generate N options" — agent generates and pushes via `add-options`, deck stays open
 4. User submits — selections returned to agent as `{ slideId: "selected label" }`

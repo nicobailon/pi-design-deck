@@ -367,12 +367,12 @@ body {
 
 .deck-footer {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 12px 32px;
+  gap: 12px; padding: 12px 32px;
   border-top: 1px solid rgba(var(--dk-ink),0.12);
   flex-shrink: 0;
 }
 
-.deck-keys { display: flex; gap: 14px; }
+.deck-keys { display: flex; align-items: center; gap: 14px; flex: 1; min-width: 0; justify-content: center; overflow: hidden; }
 .deck-key { display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--dk-text-hint); }
 .deck-key kbd {
   display: inline-flex; align-items: center; justify-content: center;
@@ -385,7 +385,7 @@ body {
 .btn-nav {
   padding: 8px 20px; border-radius: 6px; font-size: 12px; font-weight: 600;
   border: 1px solid rgba(var(--dk-ink),0.14); background: var(--dk-elevated);
-  color: var(--dk-text); transition: all 0.15s;
+  color: var(--dk-text); transition: all 0.15s; flex-shrink: 0; white-space: nowrap;
 }
 .btn-nav:hover { background: var(--dk-elevated-hover); color: var(--dk-text-label); border-color: rgba(var(--dk-ink),0.12); }
 .btn-nav:disabled { opacity: 0.3; cursor: not-allowed; }
