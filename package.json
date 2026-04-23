@@ -1,6 +1,6 @@
 {
   "name": "pi-design-deck",
-  "version": "0.3.5",
+  "version": "0.3.6",
   "description": "Visual design deck for presenting multi-slide options with high-fidelity previews",
   "author": "Nico Bailon",
   "license": "MIT",
@@ -21,6 +21,9 @@
   ],
   "scripts": {
     "test": "vitest run"
+  },
+  "dependencies": {
+    "typebox": "^1.1.24"
   },
   "pi": {
     "extensions": [

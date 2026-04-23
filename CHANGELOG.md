@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [0.3.6] - 2026-04-22
+
+### Fixed
+- Migrated extension tool schemas from `@sinclair/typebox` to `typebox` 1.x so packaged installs follow Pi's current extension runtime contract.
+
+### Changed
+- Added `typebox` as a runtime dependency for packaged installs.
+
 ## [0.3.5] - 2026-04-04
 
 ### Changed
