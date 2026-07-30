@@ -1,18 +1,19 @@
+import { StringEnum } from "@earendil-works/pi-ai";
 import { Type } from "typebox";
-import { Text } from "@mariozechner/pi-tui";
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import { Text } from "@earendil-works/pi-tui";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import * as path from "node:path";
 import * as os from "node:os";
 import * as fs from "node:fs";
 import { randomUUID } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { createRequire } from "node:module";
-import { loadSettings } from "./settings.js";
-import { getDefaultSnapshotDir, startDeckServer, type DeckServerHandle, type ModelInfo } from "./deck-server.js";
-import { deriveDeckStatusFromFolderName, isDeckOption, validateDeckConfig, validateSavedDeck, type SavedDeckData, type SavedDeckStatus } from "./deck-schema.js";
-import { buildGenerateMoreResult, buildRegenerateResult } from "./generate-prompts.js";
-import { generateWithModel } from "./model-runner.js";
-import { buildStandaloneDeckHtml } from "./export-html.js";
+import { loadSettings } from "./settings.ts";
+import { getDefaultSnapshotDir, startDeckServer, type DeckServerHandle, type ModelInfo } from "./deck-server.ts";
+import { deriveDeckStatusFromFolderName, isDeckOption, validateDeckConfig, validateSavedDeck, type SavedDeckData, type SavedDeckStatus } from "./deck-schema.ts";
+import { buildGenerateMoreResult, buildRegenerateResult } from "./generate-prompts.ts";
+import { generateWithModel } from "./model-runner.ts";
+import { buildStandaloneDeckHtml } from "./export-html.ts";
 
 interface GlimpseWindow {
 	on(event: "closed", handler: () => void): void;
@@ -106,14 +107,15 @@ const DeckParams = Type.Object(
 			})
 		),
 		action: Type.Optional(
-			Type.Union([
-				Type.Literal("add-option", { description: "Push a single generated option into a running deck session" }),
-				Type.Literal("add-options", { description: "Push multiple generated options into a running deck session (blocks until next user action)" }),
-				Type.Literal("replace-options", { description: "Replace all options for a slide with fresh alternatives" }),
-				Type.Literal("list", { description: "List saved decks from the snapshot directory" }),
-				Type.Literal("open", { description: "Open a saved deck by deck ID" }),
-				Type.Literal("export", { description: "Export a saved deck as standalone HTML" }),
-			])
+			StringEnum(["add-option", "add-options", "replace-options", "list", "open", "export"] as const, {
+				description:
+					"add-option: push one generated option into a running deck session. " +
+					"add-options: push multiple generated options (blocks until next user action). " +
+					"replace-options: replace all options for a slide with fresh alternatives. " +
+					"list: list saved decks from the snapshot directory. " +
+					"open: open a saved deck by deck ID. " +
+					"export: export a saved deck as standalone HTML.",
+			})
 		),
 		slideId: Type.Optional(
 			Type.String({ description: "Target slide ID (required with action: 'add-option', 'add-options', or 'replace-options')" })

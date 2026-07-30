@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { basename, dirname, extname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { deriveDeckStatusFromFolderName, type DeckOption, type DeckSlide, type PreviewBlock, type SavedDeckData } from "./deck-schema.js";
+import { deriveDeckStatusFromFolderName, type DeckOption, type DeckSlide, type PreviewBlock, type SavedDeckData } from "./deck-schema.ts";
 
 const FORM_DIR = join(dirname(fileURLToPath(import.meta.url)), "form");
 const CSS_FILES = ["variables", "layout", "preview", "controls"];
