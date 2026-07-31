@@ -8,9 +8,7 @@
 	<link rel="preconnect" href="https://fonts.googleapis.com">
 	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 	<link href="https://fonts.googleapis.com/css2?family=Albert+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Fira+Code:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Outfit:wght@400;500;600;700&family=Space+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-	<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1/themes/prism-tomorrow.min.css">
-	<script src="https://cdn.jsdelivr.net/npm/prismjs@1/prism.min.js"></script>
-	<script src="https://cdn.jsdelivr.net/npm/prismjs@1/plugins/autoloader/prism-autoloader.min.js"></script>
+	<!-- __PRISM_ASSETS__ -->
 	<link rel="stylesheet" href="/deck.css">
 </head>
 <body>
@@ -73,27 +71,5 @@
 		window.__DECK_DATA__ = /* __DECK_DATA_PLACEHOLDER__ */;
 	</script>
 	<script src="/deck.js"></script>
-	<script type="module">
-		import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
-		window.__mermaid = mermaid;
-		mermaid.initialize({
-			startOnLoad: false,
-			theme: 'base',
-			themeVariables: {
-				background: '#1a1a22',
-				primaryColor: '#2a3f3d',
-				primaryTextColor: '#e0e0e0',
-				primaryBorderColor: '#8abeb7',
-				lineColor: '#555555',
-				secondaryColor: '#1e2a2e',
-				tertiaryColor: '#1a1a22',
-				noteBkgColor: '#222230',
-				noteTextColor: '#b0b0b0',
-				fontSize: '13px',
-				fontFamily: "'Space Mono', monospace",
-			}
-		});
-		window.dispatchEvent(new Event('mermaid-ready'));
-	</script>
 </body>
 </html>

@@ -1,23 +1,44 @@
 // ─── MERMAID RENDERING ───────────────────────────────────────
 
-let mermaidReady = !!window.__mermaid;
+let mermaidReady = false;
+let mermaidPromise = null;
 const mermaidQueue = [];
 
-if (!mermaidReady) {
-	window.addEventListener("mermaid-ready", () => {
-		mermaidReady = true;
-		while (mermaidQueue.length > 0) {
-			mermaidQueue.shift()();
-		}
-	});
+function loadMermaid() {
+	if (mermaidPromise) return;
+	mermaidPromise = import("https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs")
+		.then(({ default: mermaid }) => {
+			window.__mermaid = mermaid;
+			mermaid.initialize({
+				startOnLoad: false,
+				theme: "base",
+				themeVariables: {
+					background: "#1a1a22",
+					primaryColor: "#2a3f3d",
+					primaryTextColor: "#e0e0e0",
+					primaryBorderColor: "#8abeb7",
+					lineColor: "#555555",
+					secondaryColor: "#1e2a2e",
+					tertiaryColor: "#1a1a22",
+					noteBkgColor: "#222230",
+					noteTextColor: "#b0b0b0",
+					fontSize: "13px",
+					fontFamily: "'Space Mono', monospace",
+				},
+			});
+			mermaidReady = true;
+			for (const render of mermaidQueue.splice(0)) render();
+		})
+		.catch(() => {});
 }
 
 function whenMermaidReady(fn) {
 	if (mermaidReady) {
 		fn();
-	} else {
-		mermaidQueue.push(fn);
+		return;
 	}
+	mermaidQueue.push(fn);
+	loadMermaid();
 }
 
 let mermaidCounter = 0;
@@ -48,6 +69,37 @@ async function renderMermaidBlock(container, content, themeOverrides) {
 	if (slide) equalizeBlockHeights(slide);
 }
 
+const PRISM_THEME_URL = "https://cdn.jsdelivr.net/npm/prismjs@1/themes/prism-tomorrow.min.css";
+const PRISM_CORE_URL = "https://cdn.jsdelivr.net/npm/prismjs@1/prism.min.js";
+const PRISM_AUTOLOADER_URL = "https://cdn.jsdelivr.net/npm/prismjs@1/plugins/autoloader/prism-autoloader.min.js";
+let prismPromise = null;
+
+function loadScript(src) {
+	return new Promise((resolve, reject) => {
+		const script = document.createElement("script");
+		script.src = src;
+		script.onload = resolve;
+		script.onerror = reject;
+		document.head.appendChild(script);
+	});
+}
+
+function loadPrism() {
+	if (prismPromise) return prismPromise;
+	if (window.Prism?.highlightElement) return Promise.resolve(window.Prism);
+
+	if (!document.querySelector(`link[href="${PRISM_THEME_URL}"]`)) {
+		const stylesheet = document.createElement("link");
+		stylesheet.rel = "stylesheet";
+		stylesheet.href = PRISM_THEME_URL;
+		document.head.appendChild(stylesheet);
+	}
+	prismPromise = loadScript(PRISM_CORE_URL)
+		.then(() => loadScript(PRISM_AUTOLOADER_URL))
+		.then(() => window.Prism);
+	return prismPromise;
+}
+
 function renderCodeBlock(container, code, lang) {
 	const pre = document.createElement("pre");
 	pre.tabIndex = -1;
@@ -57,8 +109,10 @@ function renderCodeBlock(container, code, lang) {
 	pre.appendChild(codeEl);
 	container.appendChild(pre);
 
-	if (typeof Prism !== "undefined" && Prism.highlightElement) {
-		Prism.highlightElement(codeEl);
+	if (window.Prism?.highlightElement) {
+		window.Prism.highlightElement(codeEl);
+	} else {
+		loadPrism().then((prism) => prism.highlightElement(codeEl)).catch(() => {});
 	}
 }
 
@@ -426,8 +480,10 @@ function createSummaryCard(slide) {
 					pre.appendChild(codeEl);
 					codeSnippet.appendChild(pre);
 					previewShell.appendChild(codeSnippet);
-					if (typeof Prism !== "undefined" && Prism.highlightElement) {
-						Prism.highlightElement(codeEl);
+					if (window.Prism?.highlightElement) {
+						window.Prism.highlightElement(codeEl);
+					} else {
+						loadPrism().then((prism) => prism.highlightElement(codeEl)).catch(() => {});
 					}
 				} else if (first.type === "image") {
 					const img = document.createElement("img");

@@ -111,11 +111,14 @@ class BodyTooLargeError extends Error {
 	statusCode = 413;
 }
 
+const INLINE_JSON_ESCAPES: Record<string, string> = {
+	"<": "\\u003c",
+	">": "\\u003e",
+	"&": "\\u0026",
+};
+
 export function safeInlineJSON(data: unknown): string {
-	return JSON.stringify(data)
-		.replace(/</g, "\\u003c")
-		.replace(/>/g, "\\u003e")
-		.replace(/&/g, "\\u0026");
+	return JSON.stringify(data).replace(/[<>&]/g, (char) => INLINE_JSON_ESCAPES[char]);
 }
 
 export function sendText(res: ServerResponse, status: number, text: string) {

@@ -87,11 +87,12 @@ function selectOption(optionElement) {
 
 function showSlide(index) {
 	if (index < 0 || index >= totalSlides) return;
+	const previousSlide = slidesWrap.children[current];
+	const activeSlide = slidesWrap.children[index];
 	current = index;
 
-	document.querySelectorAll(".slide").forEach((slideEl, slideIndex) => {
-		slideEl.classList.toggle("active", slideIndex === index);
-	});
+	if (previousSlide !== activeSlide) previousSlide?.classList.remove("active");
+	activeSlide?.classList.add("active");
 
 	if (progressFill) {
 		progressFill.style.width = `${((index + 1) / totalSlides) * 100}%`;
@@ -115,7 +116,6 @@ function showSlide(index) {
 		updateSummary();
 	}
 
-	const activeSlide = document.querySelector(`.slide[data-slide="${index}"]`);
 	if (activeSlide) {
 		equalizeBlockHeights(activeSlide);
 		const heading = activeSlide.querySelector("h2");

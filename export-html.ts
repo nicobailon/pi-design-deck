@@ -176,22 +176,23 @@ function formatTimestamp(value?: string): string {
 	}
 }
 
-function inlineImageSrc(src: string, baseDir: string): string {
+function inlineImageSrc(src: string, baseDir: string, imageCache: Map<string, string>): string {
 	if (/^(data:|https?:|file:|blob:)/i.test(src)) {
 		return src;
 	}
 
 	const absolutePath = resolve(baseDir, src);
-	if (!existsSync(absolutePath)) {
-		return src;
-	}
+	const cached = imageCache.get(absolutePath);
+	if (cached) return cached;
+	if (!existsSync(absolutePath)) return src;
 
 	const mimeType = IMAGE_MIME_TYPES[extname(absolutePath).toLowerCase()] || "application/octet-stream";
-	const data = readFileSync(absolutePath).toString("base64");
-	return `data:${mimeType};base64,${data}`;
+	const dataUri = `data:${mimeType};base64,${readFileSync(absolutePath).toString("base64")}`;
+	imageCache.set(absolutePath, dataUri);
+	return dataUri;
 }
 
-function renderPreviewBlocks(blocks: PreviewBlock[], baseDir: string): string {
+function renderPreviewBlocks(blocks: PreviewBlock[], baseDir: string, imageCache: Map<string, string>): string {
 	return blocks.map((block) => {
 		if (block.type === "html") {
 			return `<div class="preview-block preview-block-html">${block.content}</div>`;
@@ -202,15 +203,15 @@ function renderPreviewBlocks(blocks: PreviewBlock[], baseDir: string): string {
 		if (block.type === "code") {
 			return `<div class="preview-block preview-block-code"><pre><code class="language-${escapeHtml(block.lang)}">${escapeHtml(block.code)}</code></pre></div>`;
 		}
-		const imageSrc = inlineImageSrc(block.src, baseDir);
+		const imageSrc = inlineImageSrc(block.src, baseDir, imageCache);
 		return `<div class="preview-block preview-block-image"><img src="${escapeHtml(imageSrc)}" alt="${escapeHtml(block.alt)}" loading="lazy">${block.caption ? `<div class="preview-block-caption">${escapeHtml(block.caption)}</div>` : ""}</div>`;
 	}).join("");
 }
 
-function renderOption(option: DeckOption, slideId: string, selectedLabel: string | undefined, note: string | undefined, baseDir: string): string {
+function renderOption(option: DeckOption, slideId: string, selectedLabel: string | undefined, note: string | undefined, baseDir: string, imageCache: Map<string, string>): string {
 	const isSelected = selectedLabel === option.label;
 	const previewContent = Array.isArray(option.previewBlocks) && option.previewBlocks.length > 0
-		? renderPreviewBlocks(option.previewBlocks, baseDir)
+		? renderPreviewBlocks(option.previewBlocks, baseDir, imageCache)
 		: option.previewHtml || "";
 
 	return `
@@ -230,7 +231,7 @@ function renderOption(option: DeckOption, slideId: string, selectedLabel: string
 	`;
 }
 
-function renderSlide(slide: DeckSlide, savedDeck: SavedDeckData, slideIndex: number, baseDir: string): string {
+function renderSlide(slide: DeckSlide, savedDeck: SavedDeckData, slideIndex: number, baseDir: string, imageCache: Map<string, string>): string {
 	const selectedLabel = savedDeck.selections[slide.id];
 	const note = savedDeck.notes?.[slide.id];
 	return `
@@ -239,7 +240,7 @@ function renderSlide(slide: DeckSlide, savedDeck: SavedDeckData, slideIndex: num
 			<h2>${escapeHtml(slide.title)}</h2>
 			${slide.context ? `<p class="slide-context">${escapeHtml(slide.context)}</p>` : ""}
 			<div class="options ${optionCountClass(slide.options.length, slide.columns)}">
-				${slide.options.map((option) => renderOption(option, slide.id, selectedLabel, note, baseDir)).join("")}
+				${slide.options.map((option) => renderOption(option, slide.id, selectedLabel, note, baseDir, imageCache)).join("")}
 			</div>
 		</section>
 	`;
@@ -251,6 +252,7 @@ function renderMetaChip(label: string, value: string): string {
 
 export function buildStandaloneDeckHtml(deckPath: string, savedDeck: SavedDeckData): string {
 	const baseDir = dirname(deckPath);
+	const imageCache = new Map<string, string>();
 	const deckId = savedDeck.id || basename(baseDir) || "deck";
 	const status = savedDeck.status || deriveDeckStatusFromFolderName(deckId);
 	const hasMermaid = savedDeck.config.slides.some((slide) =>
@@ -319,7 +321,7 @@ ${EXPORT_CSS}</style>
 			</div>
 		</header>
 		<div class="slides-wrap">
-			${savedDeck.config.slides.map((slide, index) => renderSlide(slide, savedDeck, index, baseDir)).join("")}
+			${savedDeck.config.slides.map((slide, index) => renderSlide(slide, savedDeck, index, baseDir, imageCache)).join("")}
 			${savedDeck.finalNotes ? `<section class="slide active export-final-notes"><span class="slide-step">Notes</span><h2>Additional Instructions</h2><div class="export-final-notes-body">${escapeHtml(savedDeck.finalNotes)}</div></section>` : ""}
 		</div>
 	</div>
