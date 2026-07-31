@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-07-31
+
 ### Performance
 - Deck pages now load Prism only when the deck contains code preview blocks, and load Mermaid lazily on the first Mermaid block (including generated options). HTML-only decks skip ~190 KB of CDN assets and load ~45% faster on constrained networks.
 - Slide navigation updates the active slide in O(1) instead of sweeping every slide element (~30% faster on large decks).
