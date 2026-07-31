@@ -39,6 +39,9 @@ export interface ModelsPayload {
 
 const FORM_DIR = join(dirname(fileURLToPath(import.meta.url)), "form");
 const DECK_TEMPLATE = readFileSync(join(FORM_DIR, "deck.html"), "utf-8");
+const PRISM_ASSETS = `<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1/themes/prism-tomorrow.min.css">
+	<script src="https://cdn.jsdelivr.net/npm/prismjs@1/prism.min.js"></script>
+	<script src="https://cdn.jsdelivr.net/npm/prismjs@1/plugins/autoloader/prism-autoloader.min.js"></script>`;
 
 // CSS modules - concatenated in order
 const CSS_FILES = ["variables", "layout", "preview", "controls"];
@@ -231,6 +234,10 @@ export async function startDeckServer(
 	} = options;
 	const normalizedCwd = normalizePath(cwd);
 	const gitBranch = getGitBranch(cwd);
+	const needsPrism = config.slides.some((slide) =>
+		slide.options.some((option) => option.previewBlocks?.some((block) => block.type === "code"))
+	);
+	const deckTemplate = DECK_TEMPLATE.replace("<!-- __PRISM_ASSETS__ -->", needsPrism ? PRISM_ASSETS : "");
 
 	const assetsDir = mkdtempSync(join(tmpdir(), "deck-assets-"));
 
@@ -333,9 +340,9 @@ export async function startDeckServer(
 					savedFinalNotes,
 				});
 				const title = config.title ? `${config.title} — Design Deck` : "Design Deck";
-				const html = DECK_TEMPLATE
-					.replace("/* __DECK_DATA_PLACEHOLDER__ */", inlineData)
-					.replace("<title>Design Deck</title>", `<title>${title.replace(/</g, "&lt;")}</title>`);
+				const html = deckTemplate
+					.replace("/* __DECK_DATA_PLACEHOLDER__ */", () => inlineData)
+					.replace("<title>Design Deck</title>", () => `<title>${title.replace(/</g, "&lt;")}</title>`);
 				res.writeHead(200, {
 					"Content-Type": "text/html; charset=utf-8",
 					"Cache-Control": "no-store",

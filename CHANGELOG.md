@@ -2,13 +2,20 @@
 
 ## [Unreleased]
 
+### Performance
+- Deck pages now load Prism only when the deck contains code preview blocks, and load Mermaid lazily on the first Mermaid block (including generated options). HTML-only decks skip ~190 KB of CDN assets and load ~45% faster on constrained networks.
+- Slide navigation updates the active slide in O(1) instead of sweeping every slide element (~30% faster on large decks).
+- Standalone HTML export encodes each repeated local image once per export (~2x faster for image-heavy decks, byte-identical output).
+- Inline deck JSON is escaped in a single pass (~2.6x faster on large decks).
+
+### Fixed
+- Deck content containing `$&`, `$'`, or `$$` sequences no longer corrupts the inlined deck data or page title during template substitution.
+- Switched local TypeScript imports to `.ts` specifiers for current Pi extension loading.
+- Replaced the `design_deck` action schema union with `StringEnum` for provider-compatible tool schemas.
+
 ### Changed
 - Updated Pi extension imports and package metadata for the `@earendil-works/*` package scope.
 - Moved Pi-provided runtime packages to peer dependencies so packaged installs use Pi's bundled extension runtime.
-
-### Fixed
-- Switched local TypeScript imports to `.ts` specifiers for current Pi extension loading.
-- Replaced the `design_deck` action schema union with `StringEnum` for provider-compatible tool schemas.
 
 ## [0.3.6] - 2026-04-22
 
