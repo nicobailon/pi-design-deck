@@ -18,9 +18,9 @@ import {
 	validateTokenBody,
 	validateTokenQuery,
 	type SessionEntry,
-} from "./server-utils.js";
-import { isDeckOption, type DeckConfig, type DeckOption, type PreviewBlock } from "./deck-schema.js";
-import { saveGenerateModel } from "./settings.js";
+} from "./server-utils.ts";
+import { isDeckOption, type DeckConfig, type DeckOption, type PreviewBlock } from "./deck-schema.ts";
+import { saveGenerateModel } from "./settings.ts";
 
 export interface ModelInfo {
 	provider: string;

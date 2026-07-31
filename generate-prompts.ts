@@ -1,4 +1,4 @@
-import type { DeckSlide } from "./deck-schema.js";
+import type { DeckSlide } from "./deck-schema.ts";
 
 function formatHintForSlide(slide: DeckSlide | undefined): { hasBlocks: boolean; formatHint: string } {
 	const hasBlocks = slide?.options?.some((o) => o.previewBlocks && o.previewBlocks.length > 0) ?? false;

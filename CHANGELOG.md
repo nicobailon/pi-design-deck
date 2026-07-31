@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Changed
+- Updated Pi extension imports and package metadata for the `@earendil-works/*` package scope.
+- Moved Pi-provided runtime packages to peer dependencies so packaged installs use Pi's bundled extension runtime.
+
+### Fixed
+- Switched local TypeScript imports to `.ts` specifiers for current Pi extension loading.
+- Replaced the `design_deck` action schema union with `StringEnum` for provider-compatible tool schemas.
+
 ## [0.3.6] - 2026-04-22
 
 ### Fixed

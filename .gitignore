@@ -1,4 +1,5 @@
 node_modules/
 .pi/
+.pi-subagents/
 scripts/
 .DS_Store

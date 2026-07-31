@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { validateDeckConfig, isDeckOption, validateSavedDeck, deriveDeckStatusFromFolderName } from "./deck-schema.js";
+import { validateDeckConfig, isDeckOption, validateSavedDeck, deriveDeckStatusFromFolderName } from "./deck-schema.ts";
 
 function validDeck(slideOverrides: Record<string, unknown> = {}, optionOverrides: Record<string, unknown> = {}) {
 	return {
