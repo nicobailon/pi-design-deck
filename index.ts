@@ -4,6 +4,7 @@ import { Text } from "@earendil-works/pi-tui";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import * as path from "node:path";
 import * as os from "node:os";
+import * as net from "node:net";
 import * as fs from "node:fs";
 import { randomUUID } from "node:crypto";
 import { execFileSync } from "node:child_process";
@@ -49,6 +50,50 @@ async function openUrl(pi: ExtensionAPI, url: string, browser?: string): Promise
 	if (result.code !== 0) {
 		throw new Error(result.stderr || `Failed to open browser (exit code ${result.code})`);
 	}
+}
+
+// Under mosh SSH_CONNECTION is inherited (stale) and SSH_TTY is absent, so this
+// catches plain ssh and mosh sessions alike. Gates the remote hint and skips Glimpse;
+// a false positive (e.g. stale env in tmux) degrades to a browser tab plus the hint.
+function isRemoteSession(): boolean {
+	return Boolean(process.env.SSH_CONNECTION || process.env.SSH_TTY);
+}
+
+// Moshi's moshi-hook daemon owns a gateway on 127.0.0.1:24543; a live connection
+// is the same authoritative check the Moshi app itself uses.
+function probeMoshiGateway(timeoutMs = 300): Promise<boolean> {
+	return new Promise((resolve) => {
+		const socket = net.connect({ host: "127.0.0.1", port: 24543 });
+		const done = (ok: boolean) => {
+			socket.destroy();
+			resolve(ok);
+		};
+		socket.setTimeout(timeoutMs);
+		socket.once("connect", () => done(true));
+		socket.once("timeout", () => done(false));
+		socket.once("error", () => done(false));
+	});
+}
+
+// openError: null means the local browser launch succeeded.
+function remoteAccessHint(opts: { url: string; port: number; moshi: boolean; openError: string | null }): string {
+	const lines = [
+		opts.openError === null
+			? "This looks like a remote session - if no deck appeared, open it from your own device:"
+			: "Couldn't open a browser here. Open the deck from your own device:",
+		`  ${opts.url}`,
+	];
+	if (opts.openError !== null) {
+		lines.push(`Browser launch failed: ${opts.openError}`);
+	}
+	if (opts.moshi) {
+		lines.push("Moshi: tap the preview button in the terminal title bar and pick this server.");
+	}
+	lines.push(
+		`SSH: run \`ssh -L ${opts.port}:127.0.0.1:${opts.port} <this-host>\` on your local machine, then open the URL above.`,
+		"mosh can't forward ports - run that ssh command in a separate terminal."
+	);
+	return lines.join("\n");
 }
 
 interface DeckDetails {
@@ -979,7 +1024,7 @@ export default function (pi: ExtensionAPI) {
 				});
 			}
 
-			const glimpseOpenFn = os.platform() === "darwin" ? await getGlimpseOpen() : null;
+			const glimpseOpenFn = os.platform() === "darwin" && !isRemoteSession() ? await getGlimpseOpen() : null;
 			if (glimpseOpenFn) {
 				try {
 					const thisWindow = openInGlimpse(glimpseOpenFn, serverHandle.url, config.title || "Design Deck");
@@ -994,12 +1039,25 @@ export default function (pi: ExtensionAPI) {
 			}
 
 			if (!activeGlimpseWin) {
+				let openError: string | null = null;
 				try {
 					await openUrl(pi, serverHandle.url, settings.browser);
 				} catch (err) {
-					cleanupActiveDeck();
-					const message = err instanceof Error ? err.message : String(err);
-					throw new Error(`Failed to open browser: ${message}`);
+					openError = err instanceof Error ? err.message : String(err);
+				}
+				// On macOS/Windows hosts `open`/`start` succeeds over ssh but opens on the
+				// host's own display, so a remote-looking env also triggers the hint.
+				if ((openError !== null || isRemoteSession()) && onUpdate) {
+					const hint = remoteAccessHint({
+						url: serverHandle.url,
+						port: serverHandle.port,
+						moshi: await probeMoshiGateway(),
+						openError,
+					});
+					onUpdate({
+						content: [{ type: "text", text: hint }],
+						details: { status: "generate-more", url: serverHandle.url },
+					});
 				}
 			}
 
