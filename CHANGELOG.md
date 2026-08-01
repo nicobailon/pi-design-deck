@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-08-01
+
 ### Added
 - Remote-session support: tokenless `GET /` from loopback now redirects to the tokenized deck URL when the request is a top-level navigation, so Moshi's browser preview (getmoshi.app) opens the deck with one tap over its SSH forward. Page-driven cross-origin fetches still get 403.
 - When the browser can't be opened locally or the session looks remote (ssh/mosh), the tool now prints the deck URL with tailored hints: a Moshi preview tip (when the moshi-hook gateway is detected), an `ssh -L` port-forward command, and a mosh caveat.
