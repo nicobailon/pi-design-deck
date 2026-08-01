@@ -326,6 +326,22 @@ export async function startDeckServer(
 			const url = new URL(req.url || "/", `http://${req.headers.host || "127.0.0.1"}`);
 
 			if (method === "GET" && url.pathname === "/") {
+				// Loopback is the trust boundary: anything on this machine could read the
+				// token from the process anyway. Redirecting lets tokenless local opens
+				// (e.g. Moshi's browser preview over its SSH forward) land on the deck.
+				const remoteAddr = req.socket.remoteAddress;
+				const isLoopback = remoteAddr === "127.0.0.1" || remoteAddr === "::1" || remoteAddr === "::ffff:127.0.0.1";
+				// Only top-level navigations get the redirect: a page-driven fetch (Sec-Fetch-Mode
+				// cors/no-cors) following it would validate the token, touch the heartbeat, and arm
+				// the abandon watchdog for a deck nobody opened. Header-less clients (curl, ssh
+				// forwards) fail open and keep the redirect.
+				const fetchMode = req.headers["sec-fetch-mode"];
+				const isNavigation = fetchMode === undefined || fetchMode === "navigate";
+				if (!url.searchParams.has("session") && isLoopback && isNavigation) {
+					res.writeHead(302, { Location: `/?session=${sessionToken}` });
+					res.end();
+					return;
+				}
 				if (!validateTokenQuery(url, sessionToken, res)) return;
 				touchHeartbeat();
 				const inlineData = safeInlineJSON({
