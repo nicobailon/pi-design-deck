@@ -7,7 +7,7 @@ import * as os from "node:os";
 import * as net from "node:net";
 import * as fs from "node:fs";
 import { randomUUID } from "node:crypto";
-import { execFileSync } from "node:child_process";
+import { execFile, execFileSync } from "node:child_process";
 import { createRequire } from "node:module";
 import { loadSettings } from "./settings.ts";
 import { getDefaultSnapshotDir, startDeckServer, type DeckServerHandle, type ModelInfo } from "./deck-server.ts";
@@ -59,6 +59,20 @@ function isRemoteSession(): boolean {
 	return Boolean(process.env.SSH_CONNECTION || process.env.SSH_TTY);
 }
 
+// Catches the ambiguous case where pi started locally, then someone drives it over
+// ssh/Moshi later; the process env stays local, but utmp records the remote login.
+function hasActiveRemoteLogin(): Promise<boolean> {
+	return new Promise((resolve) => {
+		execFile("who", { encoding: "utf8", timeout: 2000 }, (error, out) => {
+			if (error) {
+				resolve(false);
+				return;
+			}
+			resolve(/\(.+\)\s*$/m.test(out));
+		});
+	});
+}
+
 // Moshi's moshi-hook daemon owns a gateway on 127.0.0.1:24543; a live connection
 // is the same authoritative check the Moshi app itself uses.
 function probeMoshiGateway(timeoutMs = 300): Promise<boolean> {
@@ -75,16 +89,19 @@ function probeMoshiGateway(timeoutMs = 300): Promise<boolean> {
 	});
 }
 
-// openError: null means the local browser launch succeeded.
-function remoteAccessHint(opts: { url: string; port: number; moshi: boolean; openError: string | null }): string {
+type BrowserOpenOutcome =
+	| { status: "opened-on-host" }
+	| { status: "failed"; error: string };
+
+function remoteAccessHint(opts: { url: string; port: number; moshi: boolean; outcome: BrowserOpenOutcome }): string {
 	const lines = [
-		opts.openError === null
-			? "This looks like a remote session - if no deck appeared, open it from your own device:"
+		opts.outcome.status === "opened-on-host"
+			? "Design deck opened on this host. If you're controlling this session remotely, open it from your own device:"
 			: "Couldn't open a browser here. Open the deck from your own device:",
 		`  ${opts.url}`,
 	];
-	if (opts.openError !== null) {
-		lines.push(`Browser launch failed: ${opts.openError}`);
+	if (opts.outcome.status === "failed") {
+		lines.push(`Browser launch failed: ${opts.outcome.error}`);
 	}
 	if (opts.moshi) {
 		lines.push("Moshi: tap the preview button in the terminal title bar and pick this server.");
@@ -1024,6 +1041,21 @@ export default function (pi: ExtensionAPI) {
 				});
 			}
 
+			const remoteLikely = isRemoteSession() || await hasActiveRemoteLogin();
+			const emitRemoteHint = async (outcome: BrowserOpenOutcome): Promise<void> => {
+				if (!onUpdate) return;
+				const hint = remoteAccessHint({
+					url: serverHandle.url,
+					port: serverHandle.port,
+					moshi: await probeMoshiGateway(),
+					outcome,
+				});
+				onUpdate({
+					content: [{ type: "text", text: hint }],
+					details: { status: "generate-more", url: serverHandle.url },
+				});
+			};
+
 			const glimpseOpenFn = os.platform() === "darwin" && !isRemoteSession() ? await getGlimpseOpen() : null;
 			if (glimpseOpenFn) {
 				try {
@@ -1035,29 +1067,26 @@ export default function (pi: ExtensionAPI) {
 						activeGlimpseWin = null;
 						handleCancel("user");
 					});
+					if (remoteLikely) {
+						await emitRemoteHint({ status: "opened-on-host" });
+					}
 				} catch {}
 			}
 
 			if (!activeGlimpseWin) {
-				let openError: string | null = null;
+				let openOutcome: BrowserOpenOutcome = { status: "opened-on-host" };
 				try {
 					await openUrl(pi, serverHandle.url, settings.browser);
 				} catch (err) {
-					openError = err instanceof Error ? err.message : String(err);
+					openOutcome = {
+						status: "failed",
+						error: err instanceof Error ? err.message : String(err),
+					};
 				}
 				// On macOS/Windows hosts `open`/`start` succeeds over ssh but opens on the
-				// host's own display, so a remote-looking env also triggers the hint.
-				if ((openError !== null || isRemoteSession()) && onUpdate) {
-					const hint = remoteAccessHint({
-						url: serverHandle.url,
-						port: serverHandle.port,
-						moshi: await probeMoshiGateway(),
-						openError,
-					});
-					onUpdate({
-						content: [{ type: "text", text: hint }],
-						details: { status: "generate-more", url: serverHandle.url },
-					});
+				// host's own display, so a remote-looking session also receives the hint.
+				if (openOutcome.status === "failed" || remoteLikely) {
+					await emitRemoteHint(openOutcome);
 				}
 			}
 

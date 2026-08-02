@@ -68,9 +68,38 @@ const MIME_TYPES: Record<string, string> = {
 const ABANDONED_GRACE_MS = 60000;
 const WATCHDOG_INTERVAL_MS = 5000;
 const GENERATE_TIMEOUT_MS = 90_000;
+const MOSHI_DISCOVERY_PORT_START = 8377;
+const MOSHI_DISCOVERY_PORT_END = 8396;
 
 export function getDefaultSnapshotDir(): string {
 	return join(homedir(), ".pi", "deck-snapshots");
+}
+
+function escapeHtml(value: string): string {
+	return value
+		.replace(/&/g, "&amp;")
+		.replace(/</g, "&lt;")
+		.replace(/>/g, "&gt;")
+		.replace(/"/g, "&quot;")
+		.replace(/'/g, "&#39;");
+}
+
+function isAllowedHost(hostname: string): boolean {
+	return hostname === "127.0.0.1" || hostname === "localhost" || hostname === "::1" || hostname === "[::1]";
+}
+
+function isLoopbackAddress(address: string | undefined): boolean {
+	return address === "127.0.0.1" || address === "::1" || address === "::ffff:127.0.0.1";
+}
+
+function resolvePortCandidates(port: number | undefined): number[] {
+	if (port !== undefined) return [port];
+	const candidates: number[] = [];
+	for (let candidate = MOSHI_DISCOVERY_PORT_START; candidate <= MOSHI_DISCOVERY_PORT_END; candidate += 1) {
+		candidates.push(candidate);
+	}
+	candidates.push(0);
+	return candidates;
 }
 
 function toStringMap(value: unknown): Record<string, string> | null {
@@ -323,23 +352,35 @@ export async function startDeckServer(
 	const server = http.createServer(async (req, res) => {
 		try {
 			const method = req.method || "GET";
-			const url = new URL(req.url || "/", `http://${req.headers.host || "127.0.0.1"}`);
+			const hostHeader = req.headers.host;
+			const url = new URL(req.url || "/", `http://${hostHeader || "127.0.0.1"}`);
+			if (hostHeader !== undefined && !isAllowedHost(url.hostname)) {
+				sendText(res, 403, "Invalid host");
+				return;
+			}
+
+			if (method === "HEAD" && url.pathname === "/") {
+				res.writeHead(200, {
+					"Content-Type": "text/html; charset=utf-8",
+					"Cache-Control": "no-store",
+				});
+				res.end();
+				return;
+			}
 
 			if (method === "GET" && url.pathname === "/") {
-				// Loopback is the trust boundary: anything on this machine could read the
-				// token from the process anyway. Redirecting lets tokenless local opens
-				// (e.g. Moshi's browser preview over its SSH forward) land on the deck.
-				const remoteAddr = req.socket.remoteAddress;
-				const isLoopback = remoteAddr === "127.0.0.1" || remoteAddr === "::1" || remoteAddr === "::ffff:127.0.0.1";
-				// Only top-level navigations get the redirect: a page-driven fetch (Sec-Fetch-Mode
-				// cors/no-cors) following it would validate the token, touch the heartbeat, and arm
-				// the abandon watchdog for a deck nobody opened. Header-less clients (curl, ssh
-				// forwards) fail open and keep the redirect.
-				const fetchMode = req.headers["sec-fetch-mode"];
-				const isNavigation = fetchMode === undefined || fetchMode === "navigate";
-				if (!url.searchParams.has("session") && isLoopback && isNavigation) {
-					res.writeHead(302, { Location: `/?session=${sessionToken}` });
-					res.end();
+				if (!url.searchParams.has("session") && isLoopbackAddress(req.socket.remoteAddress)) {
+					const title = config.title || "Design Deck";
+					const dest = `/?session=${encodeURIComponent(sessionToken)}`;
+					res.writeHead(200, {
+						"Content-Type": "text/html; charset=utf-8",
+						"Cache-Control": "no-store",
+					});
+					res.end(
+						`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapeHtml(title)}</title>` +
+							`<noscript><meta http-equiv="refresh" content="0;url=${escapeHtml(dest)}"></noscript></head>` +
+							`<body><script>location.replace(${JSON.stringify(dest)});</script></body></html>`
+					);
 					return;
 				}
 				if (!validateTokenQuery(url, sessionToken, res)) return;
@@ -358,7 +399,7 @@ export async function startDeckServer(
 				const title = config.title ? `${config.title} — Design Deck` : "Design Deck";
 				const html = deckTemplate
 					.replace("/* __DECK_DATA_PLACEHOLDER__ */", () => inlineData)
-					.replace("<title>Design Deck</title>", () => `<title>${title.replace(/</g, "&lt;")}</title>`);
+					.replace("<title>Design Deck</title>", () => `<title>${escapeHtml(title)}</title>`);
 				res.writeHead(200, {
 					"Content-Type": "text/html; charset=utf-8",
 					"Cache-Control": "no-store",
@@ -643,12 +684,21 @@ export async function startDeckServer(
 	});
 
 	return new Promise((resolve, reject) => {
-		const onError = (err: Error) => {
+		const candidates = resolvePortCandidates(port);
+		let attempt = 0;
+
+		const onError = (err: NodeJS.ErrnoException) => {
+			server.off("listening", onListening);
+			attempt += 1;
+			if (err.code === "EADDRINUSE" && attempt < candidates.length) {
+				server.once("error", onError);
+				server.listen(candidates[attempt], "127.0.0.1", onListening);
+				return;
+			}
 			reject(new Error(`Failed to start deck server: ${err.message}`));
 		};
 
-		server.once("error", onError);
-		server.listen(port ?? 0, "127.0.0.1", () => {
+		const onListening = () => {
 			server.off("error", onError);
 			const addr = server.address();
 			if (!addr || typeof addr === "string") {
@@ -750,6 +800,9 @@ export async function startDeckServer(
 					}
 				},
 			});
-		});
+		};
+
+		server.once("error", onError);
+		server.listen(candidates[attempt], "127.0.0.1", onListening);
 	});
 }

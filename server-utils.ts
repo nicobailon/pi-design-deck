@@ -1,5 +1,5 @@
 import { execSync } from "node:child_process";
-import { readFileSync, existsSync, renameSync, writeFileSync, mkdirSync } from "node:fs";
+import { readFileSync, existsSync, renameSync, writeFileSync, mkdirSync, chmodSync } from "node:fs";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -69,7 +69,9 @@ function readSessions(): SessionsData {
 function writeSessions(data: SessionsData): void {
 	ensurePiDir();
 	const tempFile = SESSIONS_FILE + ".tmp";
-	writeFileSync(tempFile, JSON.stringify(data, null, 2));
+	writeFileSync(tempFile, JSON.stringify(data, null, 2), { mode: 0o600 });
+	// writeFileSync's mode only applies on creation; a pre-existing .tmp keeps its old mode.
+	chmodSync(tempFile, 0o600);
 	renameSync(tempFile, SESSIONS_FILE);
 }
 
