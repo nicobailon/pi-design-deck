@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Fixed
+- Remote/Moshi discovery now matches the field-tested flow: tokenless loopback `GET /` serves a stateless `200` landing shell, `HEAD /` answers discovery probes, non-loopback `Host` headers are rejected, and deck servers prefer Moshi-discoverable low ports before falling back to ephemeral ports.
+- Deck session registry temp writes are forced to owner-only permissions before rename.
+
+### Changed
+- Remote access hints now use a nonblocking active-login probe and distinguish host-opened browser windows from launch failures.
+
 ## [0.5.0] - 2026-08-01
 
 ### Added
