@@ -304,8 +304,7 @@ function listSavedDecks(snapshotDir: string): { decks: SavedDeckListItem[]; warn
 				savedAt: saved.savedAt,
 				modifiedAt: saved.modifiedAt ?? saved.savedAt,
 				status: saved.status ?? deriveDeckStatusFromFolderName(entry.name),
-				cwd: saved.savedFrom?.cwd,
-				branch: saved.savedFrom?.branch,
+				...(saved.savedFrom ? { cwd: saved.savedFrom.cwd, branch: saved.savedFrom.branch } : {}),
 				slideCount: saved.config.slides.length,
 			});
 		} catch (err) {
@@ -364,11 +363,12 @@ function loadDeckFile(absolutePath: string): LoadedDeckSource {
 				}
 			}
 		}
+		const savedNotes = buildSavedNotesForClient(saved);
 		return {
 			configData: saved.config,
-			savedSelections: Object.keys(saved.selections).length > 0 ? saved.selections : undefined,
-			savedNotes: buildSavedNotesForClient(saved),
-			savedFinalNotes: saved.finalNotes,
+			...(Object.keys(saved.selections).length > 0 ? { savedSelections: saved.selections } : {}),
+			...(savedNotes !== undefined ? { savedNotes } : {}),
+			...(saved.finalNotes !== undefined ? { savedFinalNotes: saved.finalNotes } : {}),
 		};
 	}
 
@@ -510,7 +510,7 @@ export default function (pi: ExtensionAPI) {
 				if (warnings.length > 0) {
 					content.push({ type: "text", text: `Warnings:\n${warnings.map((w) => `- ${w}`).join("\n")}` });
 				}
-				return { content };
+				return { content, details: { status: "completed", url: "" } };
 			}
 
 			if (p.action === "add-option") {
@@ -854,6 +854,7 @@ export default function (pi: ExtensionAPI) {
 							: exportPath;
 						return {
 							content: [{ type: "text", text: `Exported HTML to ${relativePath}` }],
+							details: { status: "completed", url: "" },
 						};
 					} catch (err) {
 						const message = err instanceof Error ? err.message : String(err);
@@ -933,7 +934,7 @@ export default function (pi: ExtensionAPI) {
 									: "Design deck was cancelled.",
 						},
 					],
-					details: { status: "cancelled", url, reason },
+					details: { status: "cancelled", url, ...(reason !== undefined ? { reason } : {}) },
 				});
 			};
 
@@ -1005,14 +1006,14 @@ export default function (pi: ExtensionAPI) {
 					sessionToken,
 					sessionId,
 					cwd: ctx.cwd,
-					port: settings.port,
+					...(settings.port !== undefined ? { port: settings.port } : {}),
 					theme: {
 						mode: themeConfig.mode ?? "dark",
 						toggleHotkey: themeConfig.toggleHotkey ?? DEFAULT_THEME_HOTKEY,
 					},
-					savedSelections,
-					savedNotes,
-					savedFinalNotes,
+					...(savedSelections !== undefined ? { savedSelections } : {}),
+					...(savedNotes !== undefined ? { savedNotes } : {}),
+					...(savedFinalNotes !== undefined ? { savedFinalNotes } : {}),
 					snapshotDir,
 					autoSaveOnSubmit: settings.autoSaveOnSubmit ?? true,
 					models: {
@@ -1158,6 +1159,7 @@ export default function (pi: ExtensionAPI) {
 
 	pi.registerTool({
 		name: "deck_generate",
+		label: "Deck Generate",
 		description: "Generate text using a specific model (for design deck option generation). Use this when the generate-more prompt specifies a model override.",
 		promptSnippet:
 			"Use when design_deck generate-more/regenerate asks for a specific model. Provide {model: \"provider/model-id\", task: \"prompt\"} and return the raw generated text.",
@@ -1169,10 +1171,10 @@ export default function (pi: ExtensionAPI) {
 			const { model, task } = params as { model: string; task: string };
 			try {
 				const result = await generateWithModel(model, task);
-				return { content: [{ type: "text", text: result }] };
+				return { content: [{ type: "text", text: result }], details: {} };
 			} catch (err) {
 				const message = err instanceof Error ? err.message : String(err);
-				return { content: [{ type: "text", text: `Generation failed: ${message}` }], isError: true };
+				return { content: [{ type: "text", text: `Generation failed: ${message}` }], details: {}, isError: true };
 			}
 		},
 	});
