@@ -2,7 +2,11 @@
 
 ## [Unreleased]
 
+### Added
+- Added a strict, no-emit TypeScript check with exact optional-property validation.
+
 ### Fixed
+- Tool results now include the required details payload, `deck_generate` includes its required label, and optional saved-deck fields are omitted instead of assigned `undefined`.
 - Remote/Moshi discovery now matches the field-tested flow: tokenless loopback `GET /` serves a stateless `200` landing shell, `HEAD /` answers discovery probes, non-loopback `Host` headers are rejected, and deck servers prefer Moshi-discoverable low ports before falling back to ephemeral ports.
 - Deck session registry temp writes are forced to owner-only permissions before rename.
 

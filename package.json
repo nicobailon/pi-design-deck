@@ -20,7 +20,8 @@
     "index.ts"
   ],
   "scripts": {
-    "test": "vitest run"
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json"
   },
   "peerDependencies": {
     "@earendil-works/pi-ai": "*",
@@ -43,7 +44,9 @@
     "@earendil-works/pi-ai": "^0.83.0",
     "@earendil-works/pi-coding-agent": "^0.83.0",
     "@earendil-works/pi-tui": "^0.83.0",
+    "@types/node": "^22.20.1",
     "typebox": "^1.1.38",
+    "typescript": "^5.9.3",
     "vitest": "^4.0.18"
   }
 }

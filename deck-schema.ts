@@ -280,13 +280,13 @@ export function validateSavedDeck(data: unknown): SavedDeckData {
 		config,
 		selections,
 		savedAt: typeof obj.savedAt === "string" ? obj.savedAt : new Date().toISOString(),
-		id: typeof obj.id === "string" && obj.id.trim() !== "" ? obj.id : undefined,
-		status,
-		modifiedAt: typeof obj.modifiedAt === "string" ? obj.modifiedAt : undefined,
-		notes: Object.keys(notes).length > 0 ? notes : undefined,
-		finalNotes: typeof obj.finalNotes === "string" ? obj.finalNotes : undefined,
-		savedFrom: obj.savedFrom && typeof obj.savedFrom === "object"
-			? obj.savedFrom as SavedDeckData["savedFrom"]
-			: undefined,
+		...(typeof obj.id === "string" && obj.id.trim() !== "" ? { id: obj.id } : {}),
+		...(status !== undefined ? { status } : {}),
+		...(typeof obj.modifiedAt === "string" ? { modifiedAt: obj.modifiedAt } : {}),
+		...(Object.keys(notes).length > 0 ? { notes } : {}),
+		...(typeof obj.finalNotes === "string" ? { finalNotes: obj.finalNotes } : {}),
+		...(obj.savedFrom && typeof obj.savedFrom === "object"
+			? { savedFrom: obj.savedFrom as NonNullable<SavedDeckData["savedFrom"]> }
+			: {}),
 	};
 }

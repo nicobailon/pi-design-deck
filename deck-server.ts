@@ -530,8 +530,8 @@ export async function startDeckServer(
 					try {
 						saveDeckSnapshot(config, selections, assetsDir, normalizedCwd, gitBranch, sessionId, snapshotDir || DECK_SNAPSHOTS_DIR, {
 							status: "submitted",
-							notes,
-							finalNotes: finalNotes || undefined,
+							...(notes !== undefined ? { notes } : {}),
+							...(finalNotes ? { finalNotes } : {}),
 						});
 					} catch {}
 				}
@@ -560,8 +560,8 @@ export async function startDeckServer(
 				try {
 					const result = saveDeckSnapshot(config, selections, assetsDir, normalizedCwd, gitBranch, sessionId, snapshotDir || DECK_SNAPSHOTS_DIR, {
 						status: "in-progress",
-						notes,
-						finalNotes: finalNotes || undefined,
+						...(notes !== undefined ? { notes } : {}),
+						...(finalNotes ? { finalNotes } : {}),
 					});
 					sendJson(res, 200, { ok: true, path: result.path, relativePath: result.relativePath });
 				} catch (err) {
