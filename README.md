@@ -332,7 +332,7 @@ pi-design-deck/
 
 ## Bundled Skill
 
-The extension includes a `design-deck` skill at `skills/design-deck/SKILL.md` that teaches the agent when and how to use the design deck effectively — discovery-first vs deck-direct, slide structure, previewBlocks vs previewHtml, the generate-more loop, and model override patterns.
+The extension includes a `design-deck` skill at `skills/design-deck/SKILL.md` that teaches the agent when a deck beats a plain question, how to structure slides, which preview format fits, and how to make options that are real alternatives instead of color swaps. The generate-more and regenerate steps are spelled out in the tool's own replies, so the skill stays short (about 1.4k tokens).
 
 The skill is declared in `package.json` under `pi.skills` and is automatically discovered when the extension is installed. No manual copying needed.
 
