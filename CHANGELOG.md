@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Changed
+- Trimmed the bundled `design-deck` skill from about 4.5k to 1.4k tokens. It drops what the tool's schema and generate-more replies already say, and adds two facts agents lacked: `slides` also accepts a path to a deck JSON file, and `<script>` tags in `previewHtml` never run.
+
 ## [0.5.1] - 2026-08-02
 
 ### Added
