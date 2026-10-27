@@ -26,17 +26,12 @@ function optionTemplate(hasBlocks: boolean): string {
 			});
 }
 
-function modelHints(generateModel?: string, thinking?: string, action?: string): string {
+function modelHints(action: "add-options" | "replace-options", generateModel?: string): string {
 	if (!generateModel) return "";
-	const verb = action === "replace-options" ? "replace-options" : "add-options";
-	let hint = `\nGenerate options using deck_generate({ model: "${generateModel}", task: "..." }), then push with ${verb}.`;
-	if (thinking && thinking !== "off") {
-		hint += `\nUse thinking level: "${thinking}".`;
-	}
-	return hint;
+	return `\nGenerate options using deck_generate({ model: "${generateModel}", task: "..." }), then push with ${action}.`;
 }
 
-export function buildGenerateMoreResult(slideId: string, slide: DeckSlide | undefined, prompt?: string, generateModel?: string, thinking?: string, count: number = 1): string {
+export function buildGenerateMoreResult(slideId: string, slide: DeckSlide | undefined, prompt?: string, generateModel?: string, count: number = 1): string {
 	const title = slide?.title ?? slideId;
 	const context = slide?.context ? `\nContext: ${slide.context}` : "";
 
@@ -62,7 +57,7 @@ export function buildGenerateMoreResult(slideId: string, slide: DeckSlide | unde
 		`User clicked "Generate ${count} ${optionWord}" for slide \"${title}\".${context}${userInstructions}\n\n` +
 		`Existing options:\n${existingText}\n\n` +
 		`YOU MUST generate ${count} distinctive additional ${optionWord} and call design_deck with add-options (one call with all options in an array). ` +
-		`Do not skip this step or decide the user has enough options — they explicitly requested ${count === 1 ? "another one" : `${count} more`}.${modelHints(generateModel, thinking, "add-options")}\n\n` +
+		`Do not skip this step or decide the user has enough options — they explicitly requested ${count === 1 ? "another one" : `${count} more`}.${modelHints("add-options", generateModel)}\n\n` +
 		`design_deck({\"action\":\"add-options\",\"slideId\":\"${slideId}\",\"options\":\"[${template}${count > 1 ? ", ..." : ""}]\"})` +
 		`\n\nThe options field must be a JSON string containing an array of ${count} option object${count > 1 ? "s" : ""}.\n` +
 		`Each option needs: label, optional description, optional aside (explanatory notes below preview), optional recommended, and either previewHtml or previewBlocks.\n` +
@@ -71,7 +66,7 @@ export function buildGenerateMoreResult(slideId: string, slide: DeckSlide | unde
 	);
 }
 
-export function buildRegenerateResult(slideId: string, slide: DeckSlide | undefined, optionCount: number, prompt?: string, generateModel?: string, thinking?: string): string {
+export function buildRegenerateResult(slideId: string, slide: DeckSlide | undefined, optionCount: number, prompt?: string, generateModel?: string): string {
 	const title = slide?.title ?? slideId;
 	const context = slide?.context ? `\nContext: ${slide.context}` : "";
 
@@ -83,7 +78,7 @@ export function buildRegenerateResult(slideId: string, slide: DeckSlide | undefi
 		"The design deck is still open and waiting for your response.\n\n" +
 		`User clicked "Regenerate all" for slide \"${title}\".${context}${userInstructions}\n\n` +
 		`YOU MUST generate ${optionCount} fresh, distinctive options and call design_deck with replace-options. ` +
-		`Do not skip this step — the user explicitly requested regeneration.${modelHints(generateModel, thinking, "replace-options")}\n\n` +
+		`Do not skip this step — the user explicitly requested regeneration.${modelHints("replace-options", generateModel)}\n\n` +
 		`design_deck({\"action\":\"replace-options\",\"slideId\":\"${slideId}\",\"options\":\"[${template}, ...]\"})` +
 		`\n\nThe options field must be a JSON string containing an array of ${optionCount} option objects.\n` +
 		`Each option needs: label, optional description, optional aside, optional recommended, and either previewHtml or previewBlocks.\n` +
