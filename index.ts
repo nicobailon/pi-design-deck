@@ -954,7 +954,7 @@ export default function (pi: ExtensionAPI) {
 				}
 				const effectiveCount = count && count >= 1 && count <= 5 ? count : 1;
 				resolve({
-					content: [{ type: "text", text: buildGenerateMoreResult(slideId, slide, prompt, effectiveModel, thinking, effectiveCount) }],
+					content: [{ type: "text", text: buildGenerateMoreResult(slideId, slide, prompt, effectiveModel, effectiveCount) }],
 					details: {
 						status: "generate-more",
 						url: activeDeckServer.handle.url,
@@ -979,7 +979,7 @@ export default function (pi: ExtensionAPI) {
 					pi.setThinkingLevel(thinking as "off" | "minimal" | "low" | "medium" | "high" | "xhigh");
 				}
 				resolve({
-					content: [{ type: "text", text: buildRegenerateResult(slideId, slide, optionCount, prompt, effectiveModel, thinking) }],
+					content: [{ type: "text", text: buildRegenerateResult(slideId, slide, optionCount, prompt, effectiveModel) }],
 					details: {
 						status: "generate-more",
 						url: activeDeckServer.handle.url,
