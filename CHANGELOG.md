@@ -2,8 +2,10 @@
 
 ## [Unreleased]
 
+## [0.5.2] - 2026-10-27
+
 ### Changed
-- Trimmed the bundled `design-deck` skill from about 4.5k to 1.4k tokens. It drops what the tool's schema and generate-more replies already say, and adds two facts agents lacked: `slides` also accepts a path to a deck JSON file, and `<script>` tags in `previewHtml` never run.
+- The bundled `design-deck` skill is about a third of its old size (roughly 1.4k tokens instead of 4.5k), so it costs less context each time an agent loads it. Agents built decks just as well with it in testing. It now also tells agents that a deck can be passed as a path to a JSON file, and that `<script>` tags in HTML previews don't run.
 
 ## [0.5.1] - 2026-08-02
 
