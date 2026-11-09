@@ -11,7 +11,7 @@ import { execFile, execFileSync } from "node:child_process";
 import { createRequire } from "node:module";
 import { loadSettings } from "./settings.ts";
 import { getDefaultSnapshotDir, startDeckServer, type DeckServerHandle, type ModelInfo } from "./deck-server.ts";
-import { deriveDeckStatusFromFolderName, isDeckOption, validateDeckConfig, validateSavedDeck, type SavedDeckData, type SavedDeckStatus } from "./deck-schema.ts";
+import { deriveDeckStatusFromFolderName, describePin, isDeckOption, validateDeckConfig, validateSavedDeck, type DeckConfig, type DeckNotes, type SavedDeckData, type SavedDeckStatus } from "./deck-schema.ts";
 import { buildGenerateMoreResult, buildRegenerateResult } from "./generate-prompts.ts";
 import { generateWithModel } from "./model-runner.ts";
 import { buildStandaloneDeckHtml } from "./export-html.ts";
@@ -117,7 +117,7 @@ interface DeckDetails {
 	status: "completed" | "cancelled" | "generate-more" | "aborted" | "error";
 	url: string;
 	selections?: Record<string, string>;
-	notes?: Record<string, string>;
+	notes?: DeckNotes;
 	finalNotes?: string;
 	slideId?: string;
 	reason?: string;
@@ -153,7 +153,7 @@ interface SavedDeckListItem {
 interface LoadedDeckSource {
 	configData: unknown;
 	savedSelections?: Record<string, string>;
-	savedNotes?: Record<string, { label: string; notes: string }>;
+	savedNotes?: DeckNotes;
 	savedFinalNotes?: string;
 }
 
@@ -328,17 +328,6 @@ function resolveDeckFilePath(snapshotDir: string, deckId: string): string | null
 	return path.join(deckDir, "deck.json");
 }
 
-function buildSavedNotesForClient(saved: SavedDeckData): Record<string, { label: string; notes: string }> | undefined {
-	const savedNotesForClient: Record<string, { label: string; notes: string }> = {};
-	for (const [slideId, noteString] of Object.entries(saved.notes ?? {})) {
-		const label = saved.selections[slideId];
-		if (label && noteString) {
-			savedNotesForClient[slideId] = { label, notes: noteString };
-		}
-	}
-	return Object.keys(savedNotesForClient).length > 0 ? savedNotesForClient : undefined;
-}
-
 function loadDeckFile(absolutePath: string): LoadedDeckSource {
 	const content = fs.readFileSync(absolutePath, "utf-8");
 	let fileData: unknown;
@@ -363,11 +352,10 @@ function loadDeckFile(absolutePath: string): LoadedDeckSource {
 				}
 			}
 		}
-		const savedNotes = buildSavedNotesForClient(saved);
 		return {
 			configData: saved.config,
 			...(Object.keys(saved.selections).length > 0 ? { savedSelections: saved.selections } : {}),
-			...(savedNotes !== undefined ? { savedNotes } : {}),
+			...(saved.notes !== undefined ? { savedNotes: saved.notes } : {}),
 			...(saved.finalNotes !== undefined ? { savedFinalNotes: saved.finalNotes } : {}),
 		};
 	}
@@ -451,16 +439,27 @@ function attachDeckAbortHandler(signal: AbortSignal | undefined): void {
 	signal.addEventListener("abort", abortHandler, { once: true });
 }
 
-function formatDeckSelections(selections: Record<string, string>, notes?: Record<string, string>): string {
-	const entries = Object.entries(selections);
-	if (entries.length === 0) return "(none)";
-	return entries.map(([key, value]) => {
-		const note = notes?.[key];
-		if (note) {
-			return `- ${key}: ${value}\n  Notes: ${note}`;
+function indentLines(text: string, indent: string): string {
+	return text.split("\n").join(`\n${indent}`);
+}
+
+function formatDeckSelections(config: DeckConfig, selections: Record<string, string>, notes?: DeckNotes): string {
+	const lines: string[] = [];
+	for (const slide of config.slides) {
+		const selected = selections[slide.id];
+		const feedback = notes?.[slide.id] ?? {};
+		if (!selected && Object.keys(feedback).length === 0) continue;
+		lines.push(`- ${slide.id}: ${selected ?? "(no selection)"}`);
+		// Slide option order, so the agent reads feedback in the order the user saw the cards.
+		for (const option of slide.options) {
+			const entry = feedback[option.label];
+			if (!entry) continue;
+			lines.push(`  Feedback on "${option.label}"${option.label === selected ? " (selected)" : ""}:`);
+			if (entry.note) lines.push(`    Note: ${indentLines(entry.note, "      ")}`);
+			entry.pins.forEach((pin, i) => lines.push(`    ${indentLines(describePin(option, pin, i), "      ")}`));
 		}
-		return `- ${key}: ${value}`;
-	}).join("\n");
+	}
+	return lines.length > 0 ? lines.join("\n") : "(none)";
 }
 
 export default function (pi: ExtensionAPI) {
@@ -869,7 +868,7 @@ export default function (pi: ExtensionAPI) {
 
 			let configData: unknown;
 			let savedSelections: Record<string, string> | undefined;
-			let savedNotes: Record<string, { label: string; notes: string }> | undefined;
+			let savedNotes: DeckNotes | undefined;
 			let savedFinalNotes: string | undefined;
 			try {
 				configData = JSON.parse(slides);
@@ -896,13 +895,17 @@ export default function (pi: ExtensionAPI) {
 				};
 			}
 
-			const handleSubmit = (selections: Record<string, string>, notes?: Record<string, string>, finalNotes?: string) => {
+			const handleSubmit = (selections: Record<string, string>, notes?: DeckNotes, finalNotes?: string) => {
 				if (!activeDeckServer) return;
 				const url = activeDeckServer.handle.url;
-				const hasNotes = notes && Object.keys(notes).length > 0;
-				const textParts = [`Design deck completed.\n\nSelections:\n${formatDeckSelections(selections, notes)}`];
+				const hasNotes = notes !== undefined && Object.keys(notes).length > 0;
+				const textParts = [`Design deck completed.\n\nSelections:\n${formatDeckSelections(config, selections, notes)}`];
+				const hasPins = Object.values(notes ?? {}).some((byLabel) => Object.values(byLabel).some((entry) => entry.pins.length > 0));
+				if (hasPins) {
+					textParts.push("\n\nPins are numbered per option; positions are x%, y% from the top-left of that image or of the whole preview.");
+				}
 				if (finalNotes) {
-					textParts.push(`\nAdditional instructions:\n${finalNotes}`);
+					textParts.push(`\n\nAdditional instructions:\n${finalNotes}`);
 				}
 				cleanupActiveDeckAndStoreResult({
 					content: [

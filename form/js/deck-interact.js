@@ -1,10 +1,9 @@
 // ─── SELECTION ───────────────────────────────────────────────
 
-function applySavedSelections(savedSelections, savedNotes) {
-	if (!savedSelections || typeof savedSelections !== "object") return;
+function applySavedSelections(savedSelections, savedFeedback) {
 	isRestoringSelections = true;
 	try {
-		for (const [slideId, label] of Object.entries(savedSelections)) {
+		for (const [slideId, label] of Object.entries(savedSelections || {})) {
 			if (typeof label !== "string") continue;
 			const slideEl = document.querySelector(`.slide[data-id="${CSS.escape(slideId)}"]`);
 			if (!slideEl) continue;
@@ -18,15 +17,20 @@ function applySavedSelections(savedSelections, savedNotes) {
 	} finally {
 		isRestoringSelections = false;
 	}
-	// Restore notes
-	if (savedNotes && typeof savedNotes === "object") {
-		for (const [slideId, noteData] of Object.entries(savedNotes)) {
-			if (noteData && typeof noteData === "object" && noteData.label && noteData.notes) {
-				optionNotes[slideId] = noteData;
-				// Find and populate the textarea
-				const input = document.querySelector(`.option-notes-input[data-slide-id="${CSS.escape(slideId)}"][data-option-label="${CSS.escape(noteData.label)}"]`);
-				if (input) input.value = noteData.notes;
-			}
+	// Server data is validated; localStorage may be stale, so restore only what still maps onto a card.
+	for (const [slideId, byLabel] of Object.entries(savedFeedback || {})) {
+		for (const [label, entry] of Object.entries(byLabel || {})) {
+			const card = findCard(slideId, label);
+			if (!card || !entry || typeof entry.note !== "string" || !Array.isArray(entry.pins)) continue;
+			const pins = entry.pins.filter((pin) => pin && typeof pin.id === "string" && typeof pin.text === "string" &&
+				(pin.target === "option" ? !!card.querySelector(".preview-surface") : !!card.querySelector(`.image-frame[data-block-index="${pin.blockIndex}"]`)));
+			ensureFeedback(slideId, label).note = entry.note;
+			ensureFeedback(slideId, label).pins = pins.map((pin) => ({ ...pin }));
+			pruneFeedback(slideId, label);
+			const input = card.querySelector(".option-feedback-input");
+			input.value = entry.note;
+			autosizeField(input);
+			renderPins(card);
 		}
 	}
 }
@@ -47,7 +51,7 @@ function restoreSelections() {
 	}
 	const stored = loadSelectionsFromStorage();
 	if (stored) {
-		applySavedSelections(stored.selections || stored, stored.optionNotes);
+		applySavedSelections(stored.selections, stored.feedback);
 		// Restore final notes if present
 		if (stored.finalNotes) {
 			finalNotes = stored.finalNotes;
@@ -87,6 +91,7 @@ function selectOption(optionElement) {
 
 function showSlide(index) {
 	if (index < 0 || index >= totalSlides) return;
+	if (popover) closePinPopover();
 	const previousSlide = slidesWrap.children[current];
 	const activeSlide = slidesWrap.children[index];
 	current = index;
@@ -117,7 +122,7 @@ function showSlide(index) {
 	}
 
 	if (activeSlide) {
-		equalizeBlockHeights(activeSlide);
+		refreshActiveSlideLayout();
 		const heading = activeSlide.querySelector("h2");
 		if (heading) heading.focus({ preventScroll: true });
 	}
@@ -151,64 +156,46 @@ function navigate(direction) {
 
 // ─── KEYBOARD HANDLING ───────────────────────────────────────
 
+// Cmd/Ctrl+S and Cmd/Ctrl+Enter live in deck-session.js; this handles the bare keys.
 function handleKeydown(event) {
-	if (isClosed) return;
+	if (isClosed || event.defaultPrevented) return;
+	if (isTypingEvent(event) || isInsideDialog(event)) return;
+	if (event.metaKey || event.ctrlKey || event.altKey) return;
 
-	if (event.key === "ArrowDown" || event.key === "ArrowRight") {
-		const isInRadiogroup = document.activeElement && document.activeElement.classList.contains("option");
-		if (isInRadiogroup) {
+	const focused = document.activeElement;
+	const onOption = focused instanceof Element && focused.classList.contains("option");
+
+	if (event.key.startsWith("Arrow")) {
+		const forward = event.key === "ArrowDown" || event.key === "ArrowRight";
+		if (onOption) {
 			event.preventDefault();
-			moveFocusInRadiogroup(1);
-			return;
+			moveFocusInRadiogroup(forward ? 1 : -1);
+		} else if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+			event.preventDefault();
+			navigate(forward ? 1 : -1);
 		}
-		event.preventDefault();
-		navigate(1);
+		// Up/Down outside a card keep their default: scrolling the slide.
 		return;
 	}
 
-	if (event.key === "ArrowUp" || event.key === "ArrowLeft") {
-		const isInRadiogroup = document.activeElement && document.activeElement.classList.contains("option");
-		if (isInRadiogroup) {
-			event.preventDefault();
-			moveFocusInRadiogroup(-1);
-			return;
-		}
+	if ((event.key === " " || event.key === "Enter") && onOption) {
 		event.preventDefault();
-		navigate(-1);
-		return;
-	}
-
-	if (event.key === " ") {
-		const focused = document.activeElement;
-		if (focused && focused.classList.contains("option")) {
-			event.preventDefault();
-			selectOption(focused);
-			return;
-		}
-	}
-
-	if (event.key === "Enter") {
-		const focused = document.activeElement;
-		if (focused && focused.classList.contains("option")) {
-			event.preventDefault();
-			selectOption(focused);
-			return;
-		}
-		if (focused && focused.tagName === "BUTTON") {
-			return;
-		}
-		event.preventDefault();
-		if (current === totalSlides - 1) {
-			submitDeck().catch(() => {});
-		} else {
-			navigate(1);
-		}
+		selectOption(focused);
 		return;
 	}
 
 	if (event.key === "Escape") {
 		event.preventDefault();
-		handleEscape();
+		// Innermost layer first: open comment, then comment mode, then the cancel prompt.
+		if (popover) closePinPopover();
+		else if (commentMode) setCommentMode(false);
+		else handleEscape();
+		return;
+	}
+
+	if (event.key === "c" || event.key === "C") {
+		event.preventDefault();
+		setCommentMode(!commentMode);
 		return;
 	}
 

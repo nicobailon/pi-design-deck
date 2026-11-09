@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+### Added
+- Pinned comments: press `C` (or click Comment) and click anywhere on a preview or image to drop a numbered pin with its own comment. Pins can be dragged, edited and deleted, a numbered list under each card mirrors them, and they stay on the same spot when the window or column layout changes. Clicks in comment mode never trigger the preview's own links or buttons.
+- Full-size image view: a maximize button on each image opens it at full resolution, with scroll or pinch to zoom, drag to pan, the caption and alt text, and pins. Escape or a click outside closes it.
+- `Cmd/Ctrl+Enter` submits the deck from anywhere, including inside a field.
+
+### Fixed
+- Typing in a note no longer triggers deck shortcuts. Arrow keys used to switch slides, Enter moved on or submitted the deck, digits selected options and Escape opened the cancel bar. Shortcuts now ignore text fields and IME composition; `Cmd/Ctrl+S` and `Cmd/Ctrl+Enter` still work everywhere.
+- Feedback reaches the agent. Writing a note on one option used to erase the note on another, and notes on options you didn't pick were dropped on submit. Each option now keeps its own feedback, and the agent's result lists every option's note and pins.
+- Escape no longer cancels at once when you've written feedback but haven't picked anything yet; it asks first.
+
+### Changed
+- The notes field is now a readable feedback box that grows as you type.
+- Up/Down arrows outside a card scroll the slide instead of switching slides, and plain `Enter` no longer moves to the next slide or submits.
+- Breaking: `notes` in saved `deck.json` files and in the `/submit` and `/save` payloads is now `{ [slideId]: { [optionLabel]: { note, pins } } }`. Saved decks in the old one-note-per-slide format fail to load with a clear error.
+
 ## [0.5.2] - 2026-10-27
 
 ### Changed

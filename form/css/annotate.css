@@ -1,0 +1,273 @@
+/**
+ * annotate.css
+ * Preview surface, comment mode, pins, pin popover, image viewer
+ */
+
+/* ─────────────────────────────────────────────────────────────
+   PREVIEW SURFACE
+   ───────────────────────────────────────────────────────────── */
+
+/* Pins are positioned as fractions of these boxes, so they hug content, not the stretched grid cell */
+.preview-surface { position: relative; min-height: inherit; }
+/* Isolated so z-indexes inside previewHtml can never rise above the pins */
+.preview-content { isolation: isolate; min-height: inherit; }
+
+.image-frame { position: relative; line-height: 0; }
+
+.pin-layer { position: absolute; inset: 0; pointer-events: none; z-index: 4; }
+
+.image-expand {
+  /* Below the pin layer (4) so a pin in the corner stays clickable */
+  position: absolute; top: 8px; right: 8px; z-index: 3;
+  width: 30px; height: 30px;
+  display: grid; place-items: center;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.22);
+  background: rgba(12,12,16,0.62);
+  color: #fff;
+  backdrop-filter: blur(6px);
+  opacity: 0;
+  pointer-events: auto;
+  transition: opacity 0.15s, background 0.15s;
+}
+.image-expand svg { width: 15px; height: 15px; }
+.image-frame:hover .image-expand,
+.image-expand:focus-visible { opacity: 1; }
+.image-expand:hover { background: rgba(12,12,16,0.85); }
+.image-expand:focus-visible { outline: 2px solid var(--dk-accent); outline-offset: 2px; }
+@media (hover: none) { .image-expand { opacity: 1; } }
+
+/* ─────────────────────────────────────────────────────────────
+   COMMENT MODE
+   ───────────────────────────────────────────────────────────── */
+
+.slide-pick-text { display: inline-flex; align-items: center; gap: 6px; }
+.slide-comment-hint { display: none; color: var(--dk-pin-text); font-weight: 500; }
+.deck.commenting .slide-pick-text { display: none; }
+.deck.commenting .slide-comment-hint { display: inline; }
+
+.comment-toggle {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 7px 5px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(var(--dk-ink),0.14);
+  background: transparent;
+  color: var(--dk-text-secondary);
+  font: 500 12px var(--dk-font);
+  white-space: nowrap;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.slide-pick .comment-toggle { margin-left: auto; }
+.comment-toggle svg { width: 14px; height: 14px; }
+.comment-toggle kbd {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 18px; height: 18px; padding: 0 4px;
+  border-radius: 4px;
+  background: rgba(var(--dk-ink),0.08);
+  font: 500 10px var(--dk-font-mono);
+  color: inherit;
+}
+.comment-toggle:hover { color: var(--dk-text-label); border-color: rgba(var(--dk-ink),0.26); }
+.comment-toggle[aria-pressed="true"] { background: var(--dk-pin); border-color: var(--dk-pin); color: #fff; }
+.comment-toggle[aria-pressed="true"] kbd { background: rgba(255,255,255,0.22); }
+.comment-toggle:focus-visible { outline: 2px solid var(--dk-accent); outline-offset: 2px; }
+.comment-toggle:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* The preview turns into a canvas: its own controls stay inert, clicks drop pins */
+.deck.commenting .preview-content { pointer-events: none; user-select: none; }
+.deck.commenting .preview-surface { cursor: crosshair; }
+.deck.commenting .preview-surface::after {
+  content: ""; position: absolute; inset: 0; z-index: 3; pointer-events: none;
+  box-shadow: inset 0 0 0 1.5px transparent;
+  transition: box-shadow 0.12s;
+}
+.deck.commenting .preview-surface.pin-target::after { box-shadow: inset 0 0 0 1.5px rgba(var(--dk-pin-rgb),0.7); }
+.deck.commenting .image-frame.pin-target { outline: 2px solid rgba(var(--dk-pin-rgb),0.85); outline-offset: -2px; }
+
+/* ─────────────────────────────────────────────────────────────
+   PINS
+   ───────────────────────────────────────────────────────────── */
+
+/* Teardrop whose sharp corner sits exactly on the pinned point */
+.pin {
+  position: absolute;
+  width: 26px; height: 26px; padding: 0;
+  transform: translate(0, -100%);
+  border-radius: 50% 50% 50% 3px;
+  border: 2px solid #fff;
+  background: var(--dk-pin);
+  color: #fff;
+  font: 700 11px/22px var(--dk-font-mono);
+  text-align: center;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.35), 0 0 0 1px rgba(0,0,0,0.12);
+  pointer-events: auto;
+  cursor: grab;
+  touch-action: none;
+  z-index: 1;
+  transition: box-shadow 0.12s;
+}
+.pin.pin-flip-x { transform: translate(-100%, -100%); border-radius: 50% 50% 3px 50%; }
+.pin.pin-flip-y { transform: translate(0, 0); border-radius: 3px 50% 50% 50%; }
+.pin.pin-flip-x.pin-flip-y { transform: translate(-100%, 0); border-radius: 50% 3px 50% 50%; }
+.pin:hover, .pin.pin-hot, .pin.pin-active {
+  z-index: 2;
+  box-shadow: 0 0 0 4px rgba(var(--dk-pin-rgb),0.35), 0 4px 12px rgba(0,0,0,0.4);
+}
+.pin.dragging { cursor: grabbing; z-index: 3; box-shadow: 0 0 0 5px rgba(var(--dk-pin-rgb),0.3), 0 8px 18px rgba(0,0,0,0.45); }
+.pin:focus-visible { outline: 2px solid var(--dk-accent); outline-offset: 2px; }
+
+.pin-badge {
+  flex: none;
+  width: 18px; height: 18px; border-radius: 50%;
+  background: var(--dk-pin); color: #fff;
+  font: 700 10px/18px var(--dk-font-mono);
+  text-align: center;
+}
+
+.pin-list { list-style: none; display: flex; flex-direction: column; gap: 1px; margin: -2px -6px 0; }
+.pin-list[hidden] { display: none; }
+.pin-list-item {
+  display: flex; align-items: flex-start; gap: 8px;
+  width: 100%; padding: 5px 6px;
+  border: 0; border-radius: 6px;
+  background: transparent;
+  text-align: left;
+  font-size: 12.5px; line-height: 1.45;
+  color: var(--dk-text-strong);
+  transition: background 0.12s;
+}
+.pin-list-item .pin-badge { margin-top: 1px; }
+.pin-list-item:hover, .pin-list-item.pin-hot { background: rgba(var(--dk-ink),0.06); }
+.pin-list-item:focus-visible { outline: 2px solid var(--dk-accent); outline-offset: -2px; }
+.pin-list-text { flex: 1; min-width: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.pin-list-text.empty { color: var(--dk-text-hint); font-style: italic; }
+.pin-list-where {
+  flex: none; margin-top: 2px;
+  font: 500 10px var(--dk-font-mono); letter-spacing: 0.04em; text-transform: uppercase;
+  color: var(--dk-text-hint);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   PIN POPOVER
+   ───────────────────────────────────────────────────────────── */
+
+.pin-popover {
+  position: fixed; z-index: 160;
+  width: 288px; max-width: calc(100vw - 16px);
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(var(--dk-ink),0.14);
+  background: var(--dk-popover);
+  box-shadow: 0 16px 40px -12px rgba(0,0,0,0.55), 0 2px 6px rgba(0,0,0,0.18);
+  animation: pin-popover-in 0.14s ease-out;
+}
+@keyframes pin-popover-in { from { opacity: 0; translate: 0 4px; } }
+.pin-popover-head { display: flex; align-items: center; gap: 8px; }
+.pin-popover-title { flex: 1; min-width: 0; font-size: 12px; font-weight: 600; color: var(--dk-text-label); }
+.pin-popover-delete {
+  padding: 3px 8px; border: 0; border-radius: 6px;
+  background: transparent; color: var(--dk-text-secondary);
+  font-size: 12px; font-weight: 500;
+}
+.pin-popover-delete:hover { color: var(--dk-status-error); background: rgba(248,113,113,0.12); }
+.pin-popover-input { min-height: 52px; max-height: 200px; }
+.pin-popover-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.pin-popover-hint { font-size: 11px; color: var(--dk-text-hint); }
+.pin-popover-done {
+  padding: 5px 14px; border: 0; border-radius: 7px;
+  background: var(--dk-accent); color: #0f2321;
+  font-size: 12px; font-weight: 600;
+}
+.pin-popover-done:hover { filter: brightness(1.08); }
+.pin-popover button:focus-visible { outline: 2px solid var(--dk-accent); outline-offset: 2px; }
+
+/* ─────────────────────────────────────────────────────────────
+   IMAGE VIEWER
+   ───────────────────────────────────────────────────────────── */
+
+/* No transform on the dialog: the pin popover inside it is position: fixed */
+.image-viewer {
+  width: min(1600px, 96vw); height: 94dvh;
+  max-width: none; max-height: none;
+  margin: auto; padding: 0;
+  border: 1px solid rgba(var(--dk-ink),0.14);
+  border-radius: 14px;
+  background: var(--dk-bg);
+  color: var(--dk-text);
+  overflow: hidden;
+  box-shadow: 0 24px 80px rgba(0,0,0,0.5);
+}
+.image-viewer[open] { display: flex; flex-direction: column; animation: viewer-in 0.16s ease-out; }
+@keyframes viewer-in { from { opacity: 0; } }
+.image-viewer::backdrop { background: rgba(6,6,10,0.72); backdrop-filter: blur(3px); }
+[data-theme="light"] .image-viewer::backdrop { background: rgba(24,24,32,0.45); }
+
+.viewer-bar {
+  flex: none;
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 12px 10px 18px;
+  border-bottom: 1px solid rgba(var(--dk-ink),0.1);
+}
+.viewer-title {
+  flex: 1; min-width: 0;
+  font-size: 13px; font-weight: 600; color: var(--dk-text-strong);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.viewer-tools { display: flex; align-items: center; gap: 6px; }
+.viewer-btn {
+  min-width: 32px; height: 32px; padding: 0 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(var(--dk-ink),0.12);
+  background: rgba(var(--dk-ink),0.04);
+  color: var(--dk-text-label);
+  font: 500 15px/1 var(--dk-font);
+  transition: background 0.12s;
+}
+.viewer-btn:hover { background: rgba(var(--dk-ink),0.1); }
+.viewer-btn:focus-visible { outline: 2px solid var(--dk-accent); outline-offset: 2px; }
+.viewer-zoom { min-width: 62px; font: 500 12px var(--dk-font-mono); }
+.viewer-close { margin-left: 6px; font-size: 14px; }
+
+.viewer-stage {
+  position: relative; flex: 1; min-height: 0;
+  overflow: hidden;
+  background-color: var(--dk-viewer-stage);
+  background-image: conic-gradient(rgba(var(--dk-ink),0.035) 25%, transparent 0 50%, rgba(var(--dk-ink),0.035) 0 75%, transparent 0);
+  background-size: 24px 24px;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+.viewer-stage.panning { cursor: grabbing; }
+.image-viewer.commenting .viewer-stage { cursor: crosshair; }
+.viewer-img {
+  position: absolute; left: 0; top: 0;
+  max-width: none;
+  transform-origin: 0 0;
+  opacity: 0;
+  transition: opacity 0.15s;
+  pointer-events: none;
+}
+.image-viewer.ready .viewer-img { opacity: 1; }
+.viewer-pins { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+
+.viewer-meta {
+  flex: none;
+  display: flex; flex-direction: column; gap: 3px;
+  padding: 10px 18px 12px;
+  border-top: 1px solid rgba(var(--dk-ink),0.1);
+}
+.viewer-caption { font-size: 13px; font-weight: 500; color: var(--dk-text-strong); }
+.viewer-alt { font-size: 12px; color: var(--dk-text-secondary); }
+.viewer-alt::before { content: "Alt text · "; color: var(--dk-text-hint); }
+
+/* ─────────────────────────────────────────────────────────────
+   SUMMARY FEEDBACK
+   ───────────────────────────────────────────────────────────── */
+
+.summary-notes-label { display: block; margin-bottom: 4px; }
+.summary-notes-body { white-space: pre-wrap; }
+.summary-pins { margin: 4px 0 0; padding-left: 18px; }
+.summary-pins li { margin: 2px 0; white-space: pre-wrap; }
+.summary-others { margin-top: 8px; font-size: 11px; color: var(--dk-text-hint); }

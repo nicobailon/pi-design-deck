@@ -1,10 +1,10 @@
 import { existsSync, readFileSync } from "node:fs";
 import { basename, dirname, extname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { deriveDeckStatusFromFolderName, type DeckOption, type DeckSlide, type PreviewBlock, type SavedDeckData } from "./deck-schema.ts";
+import { deriveDeckStatusFromFolderName, describePin, type DeckOption, type DeckSlide, type OptionFeedback, type PreviewBlock, type SavedDeckData } from "./deck-schema.ts";
 
 const FORM_DIR = join(dirname(fileURLToPath(import.meta.url)), "form");
-const CSS_FILES = ["variables", "layout", "preview", "controls"];
+const CSS_FILES = ["variables", "layout", "preview", "controls", "annotate"];
 const EMBEDDED_CSS = CSS_FILES
 	.map((name) => readFileSync(join(FORM_DIR, "css", `${name}.css`), "utf-8"))
 	.join("\n");
@@ -208,7 +208,16 @@ function renderPreviewBlocks(blocks: PreviewBlock[], baseDir: string, imageCache
 	}).join("");
 }
 
-function renderOption(option: DeckOption, slideId: string, selectedLabel: string | undefined, note: string | undefined, baseDir: string, imageCache: Map<string, string>): string {
+function renderFeedback(option: DeckOption, feedback: OptionFeedback | undefined): string {
+	if (!feedback) return "";
+	const note = feedback.note ? `<div class="summary-notes-body">${escapeHtml(feedback.note)}</div>` : "";
+	const pins = feedback.pins.length > 0
+		? `<ol class="summary-pins">${feedback.pins.map((pin, i) => `<li>${escapeHtml(describePin(option, pin, i))}</li>`).join("")}</ol>`
+		: "";
+	return `<div class="summary-notes"><span class="summary-notes-label">Feedback</span>${note}${pins}</div>`;
+}
+
+function renderOption(option: DeckOption, slideId: string, selectedLabel: string | undefined, feedback: OptionFeedback | undefined, baseDir: string, imageCache: Map<string, string>): string {
 	const isSelected = selectedLabel === option.label;
 	const previewContent = Array.isArray(option.previewBlocks) && option.previewBlocks.length > 0
 		? renderPreviewBlocks(option.previewBlocks, baseDir, imageCache)
@@ -225,7 +234,7 @@ function renderOption(option: DeckOption, slideId: string, selectedLabel: string
 			<div class="preview${Array.isArray(option.previewBlocks) && option.previewBlocks.length > 0 ? " preview-blocks" : ""}">${previewContent}</div>
 			<div class="option-footer">
 				${option.aside ? `<div class="option-aside">${escapeHtml(option.aside).replace(/\\n/g, "<br>").replace(/\n/g, "<br>")}</div>` : ""}
-				${isSelected && note ? `<div class="summary-notes"><span class="summary-notes-label">Your notes:</span> ${escapeHtml(note)}</div>` : ""}
+				${renderFeedback(option, feedback)}
 			</div>
 		</article>
 	`;
@@ -233,14 +242,14 @@ function renderOption(option: DeckOption, slideId: string, selectedLabel: string
 
 function renderSlide(slide: DeckSlide, savedDeck: SavedDeckData, slideIndex: number, baseDir: string, imageCache: Map<string, string>): string {
 	const selectedLabel = savedDeck.selections[slide.id];
-	const note = savedDeck.notes?.[slide.id];
+	const slideFeedback = savedDeck.notes?.[slide.id] ?? {};
 	return `
 		<section class="slide active" data-id="${escapeHtml(slide.id)}" data-slide="${slideIndex}">
 			<span class="slide-step">${slideIndex + 1} / ${savedDeck.config.slides.length}</span>
 			<h2>${escapeHtml(slide.title)}</h2>
 			${slide.context ? `<p class="slide-context">${escapeHtml(slide.context)}</p>` : ""}
 			<div class="options ${optionCountClass(slide.options.length, slide.columns)}">
-				${slide.options.map((option) => renderOption(option, slide.id, selectedLabel, note, baseDir, imageCache)).join("")}
+				${slide.options.map((option) => renderOption(option, slide.id, selectedLabel, slideFeedback[option.label], baseDir, imageCache)).join("")}
 			</div>
 		</section>
 	`;

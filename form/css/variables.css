@@ -28,6 +28,12 @@
   --dk-status-warn: #f0c674;
   --dk-status-error: #f87171;
   --dk-overlay: rgba(24,24,30,0.95);
+  /* Pins: white text on --dk-pin stays above 4.5:1; --dk-pin-text is the same hue for text on the page */
+  --dk-pin: #d4462a;
+  --dk-pin-rgb: 212,70,42;
+  --dk-pin-text: #ff8f72;
+  --dk-popover: #272731;
+  --dk-viewer-stage: #0d0d12;
 }
 
 [data-theme="light"] {
@@ -51,4 +57,9 @@
   --dk-status-warn: #d97706;
   --dk-status-error: #af5f5f;
   --dk-overlay: rgba(255,255,255,0.95);
+  --dk-pin: #c63d22;
+  --dk-pin-rgb: 198,61,34;
+  --dk-pin-text: #b23a1f;
+  --dk-popover: #ffffff;
+  --dk-viewer-stage: #e9e9ec;
 }

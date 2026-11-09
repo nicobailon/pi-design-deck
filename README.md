@@ -101,13 +101,14 @@ The browser opens, the user picks "JWT + Refresh Tokens", and the agent receives
 - **Smart rebalancing**: Grid layout recalculates after generate-more adds options to minimize orphans.
 - **Option aside**: Explanatory text rendered below the preview. Supports `\n` for line breaks.
 - **Save/load snapshots**: `Cmd+S` saves the deck to disk. Use `action: "list"` to enumerate saved decks, `action: "open"` to reopen one by deck ID, or pass a file path to `slides`.
-- **Notes persistence**: Saved decks include selected-option notes and summary-slide final instructions, and reopening restores both from disk.
+- **Feedback and pinned comments**: Write feedback on any option, not just the one you pick. Press `C` and click anywhere on a preview or image to pin a numbered comment you can drag, edit or delete. The agent receives every note and pin with its position, for example `#2 (image 1, 62%, 18%): logo too small`, and saved decks restore them along with the summary's final instructions.
+- **Full-size images**: The maximize button on an image opens it at full resolution. Zoom with the scroll wheel or a pinch, drag to pan, and pin comments there too.
 - **Standalone HTML export**: `action: "export"` writes a read-only `export.html` next to the saved deck snapshot.
 - **Light/dark/auto theme**: Full theme toggle with `Cmd+Shift+L` (configurable). Persists in localStorage.
 - **Heartbeat watchdog**: Server detects lost browser connections (60s grace) and cleans up.
 - **Idle timeout**: 5-minute inactivity timer after generate-more. Closes the deck if the agent doesn't respond.
-- **Escape confirmation**: Pressing Escape with existing selections shows a confirmation bar before cancelling.
-- **ARIA / keyboard**: `role="radiogroup"` on options, arrow key navigation, Space/Enter to select, number keys for quick pick.
+- **Escape confirmation**: Once you've picked or written anything, Escape shows a confirmation bar before cancelling.
+- **ARIA / keyboard**: `role="radiogroup"` on options, arrow key navigation, Space/Enter to select, number keys for quick pick. Shortcuts never fire while you type in a field.
 
 ## How It Works
 
@@ -243,13 +244,16 @@ design_deck({ action: "export", deckId: "api-design-myapp-main-2026-02-22-143000
 
 | Key | Action |
 |-----|--------|
-| `Arrow keys` | Navigate slides (left/right) or options within a slide (up/down) |
-| `Space` / `Enter` | Select focused option |
+| `←` / `→` | Previous / next slide (when a card has focus, arrow keys move between options) |
+| `Space` / `Enter` | Select the focused option |
 | `1`-`9` | Quick-select option by number |
-| `Enter` (on last slide) | Submit |
-| `Cmd+S` | Save deck snapshot |
+| `C` | Comment mode: click a preview or image to pin a comment |
+| `Cmd/Ctrl+Enter` | Submit (opens the summary if a slide still needs a pick) |
+| `Cmd/Ctrl+S` | Save deck snapshot |
 | `Cmd+Shift+L` | Toggle theme (configurable) |
-| `Escape` | Cancel (confirmation bar if selections exist) |
+| `Escape` | Close the open comment, then leave comment mode, then cancel (confirmation bar if you've picked or written anything) |
+
+Shortcuts are ignored while you type in a field, except `Cmd/Ctrl+S` and `Cmd/Ctrl+Enter`. In a comment, `Enter` saves and `Shift+Enter` adds a line. In the image viewer, `+`, `-` and `0` zoom in, zoom out and fit, and `Escape` or a click outside closes it.
 
 ## Configuration
 

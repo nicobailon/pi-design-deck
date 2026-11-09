@@ -26,8 +26,10 @@ let lastSavedLabel = "";
 let isRestoringSelections = false;
 
 const selections = {};
-const optionNotes = {};
+// slideId → option label → { note, pins: [{ id, target, blockIndex, x, y, text }] }
+const feedback = {};
 let finalNotes = "";
+let commentMode = false;
 const pendingGenerate = new Map();
 let selectedModel = "";
 let selectedThinking = "off";
@@ -52,6 +54,69 @@ function createElement(tag, className, text) {
 
 function escapeHtml(str) {
 	return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+const isMac = navigator.platform.toUpperCase().indexOf("MAC") >= 0;
+
+function isModKey(event) {
+	return isMac ? event.metaKey : event.ctrlKey;
+}
+
+// Document-level shortcuts must never fire while the user is typing or composing (IME),
+// or while the image viewer dialog owns the keyboard.
+function isTypingEvent(event) {
+	if (event.isComposing || event.keyCode === 229) return true;
+	const target = event.target;
+	if (!(target instanceof Element)) return false;
+	return !!target.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"])');
+}
+
+function isInsideDialog(event) {
+	return event.target instanceof Element && !!event.target.closest("dialog");
+}
+
+function autosizeField(field) {
+	if (CSS.supports("field-sizing", "content")) return;
+	field.style.height = "auto";
+	field.style.height = `${field.scrollHeight + field.offsetHeight - field.clientHeight}px`;
+}
+
+// ─── FEEDBACK STATE ──────────────────────────────────────────
+
+function getFeedback(slideId, label) {
+	return feedback[slideId]?.[label] || null;
+}
+
+function ensureFeedback(slideId, label) {
+	const bySlide = (feedback[slideId] ??= {});
+	return (bySlide[label] ??= { note: "", pins: [] });
+}
+
+function pruneFeedback(slideId, label) {
+	const entry = getFeedback(slideId, label);
+	if (!entry || entry.note.trim() || entry.pins.length > 0) return;
+	delete feedback[slideId][label];
+	if (Object.keys(feedback[slideId]).length === 0) delete feedback[slideId];
+}
+
+// Wire shape for /submit and /save: every option with feedback, selected or not.
+function buildFeedbackPayload() {
+	const out = {};
+	for (const [slideId, byLabel] of Object.entries(feedback)) {
+		for (const [label, entry] of Object.entries(byLabel)) {
+			const note = entry.note.trim();
+			const pins = entry.pins
+				.filter((pin) => pin.text.trim())
+				.map((pin) => ({ id: pin.id, target: pin.target, blockIndex: pin.blockIndex, x: pin.x, y: pin.y, text: pin.text.trim() }));
+			if (!note && pins.length === 0) continue;
+			(out[slideId] ??= {})[label] = { note, pins };
+		}
+	}
+	return out;
+}
+
+function hasAnyInput() {
+	return Object.keys(selections).length > 0 || Object.keys(buildFeedbackPayload()).length > 0 || !!finalNotes;
 }
 
 function equalizeBlockHeights(container) {
@@ -222,6 +287,7 @@ function initTheme() {
 			shortcut.classList.remove("hidden");
 		}
 		document.addEventListener("keydown", (event) => {
+			if (isTypingEvent(event) || isInsideDialog(event)) return;
 			if (matchesHotkey(event, hotkey)) { event.preventDefault(); toggleTheme(); }
 		});
 	}
@@ -256,6 +322,7 @@ function applyLayout(cols) {
 	} else {
 		delete deck.dataset.layout;
 	}
+	refreshActiveSlideLayout();
 }
 
 function updateLayoutButtons(activeCols) {
@@ -305,7 +372,7 @@ const SELECTIONS_KEY = `pi-deck-${typeof deckData.sessionId === "string" ? deckD
 
 function saveSelectionsToStorage() {
 	try { 
-		const data = { selections, optionNotes };
+		const data = { selections, feedback };
 		if (finalNotes) data.finalNotes = finalNotes;
 		localStorage.setItem(SELECTIONS_KEY, JSON.stringify(data)); 
 	} catch {}
@@ -315,12 +382,7 @@ function loadSelectionsFromStorage() {
 	try {
 		const saved = localStorage.getItem(SELECTIONS_KEY);
 		if (!saved) return null;
-		const parsed = JSON.parse(saved);
-		// Handle both old format (just selections) and new format ({ selections, optionNotes })
-		if (parsed && typeof parsed === "object" && !parsed.selections) {
-			return { selections: parsed, optionNotes: {} };
-		}
-		return parsed;
+		return JSON.parse(saved);
 	} catch { return null; }
 }
 

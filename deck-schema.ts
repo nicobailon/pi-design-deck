@@ -225,6 +225,86 @@ export function validateDeckConfig(data: unknown): DeckConfig {
 	return obj as unknown as DeckConfig;
 }
 
+export interface DeckPin {
+	id: string;
+	target: "option" | "image";
+	/** Index into the option's previewBlocks for image pins; -1 for pins on the whole preview. */
+	blockIndex: number;
+	/** 0–1 fractions of the target's box, measured from its top-left corner. */
+	x: number;
+	y: number;
+	text: string;
+}
+
+export interface OptionFeedback {
+	note: string;
+	pins: DeckPin[];
+}
+
+/** slideId → option label → feedback. Covers every option the user commented on, selected or not. */
+export type DeckNotes = Record<string, Record<string, OptionFeedback>>;
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+	return !!value && typeof value === "object" && !Array.isArray(value);
+}
+
+function validatePin(pin: unknown, option: DeckOption, where: string): DeckPin {
+	if (!isPlainObject(pin)) throw new Error(`${where} must be an object`);
+	if (typeof pin.id !== "string" || pin.id.trim() === "") throw new Error(`${where}.id must be a non-empty string`);
+	if (pin.target !== "option" && pin.target !== "image") throw new Error(`${where}.target must be "option" or "image"`);
+	if (typeof pin.blockIndex !== "number" || !Number.isInteger(pin.blockIndex)) {
+		throw new Error(`${where}.blockIndex must be an integer`);
+	}
+	if (pin.target === "option" && pin.blockIndex !== -1) {
+		throw new Error(`${where}.blockIndex must be -1 for option pins`);
+	}
+	if (pin.target === "image" && option.previewBlocks?.[pin.blockIndex]?.type !== "image") {
+		throw new Error(`${where}.blockIndex must point to an image block of option "${option.label}"`);
+	}
+	for (const axis of ["x", "y"] as const) {
+		const value = pin[axis];
+		if (typeof value !== "number" || !Number.isFinite(value) || value < 0 || value > 1) {
+			throw new Error(`${where}.${axis} must be a number from 0 to 1`);
+		}
+	}
+	if (typeof pin.text !== "string" || pin.text.trim() === "") throw new Error(`${where}.text must be a non-empty string`);
+	return { id: pin.id, target: pin.target, blockIndex: pin.blockIndex, x: pin.x as number, y: pin.y as number, text: pin.text };
+}
+
+/** Validates feedback against the deck it belongs to, so every pin resolves to a real option and image. */
+export function validateDeckNotes(value: unknown, config: DeckConfig): DeckNotes {
+	if (!isPlainObject(value)) throw new Error("notes must map slide ids to option feedback");
+	const out: DeckNotes = {};
+	for (const [slideId, byLabel] of Object.entries(value)) {
+		const slide = config.slides.find((s) => s.id === slideId);
+		if (!slide) throw new Error(`notes: unknown slide "${slideId}"`);
+		if (!isPlainObject(byLabel)) throw new Error(`notes.${slideId} must map option labels to feedback`);
+		const slideOut: Record<string, OptionFeedback> = {};
+		for (const [label, entry] of Object.entries(byLabel)) {
+			const where = `notes.${slideId}["${label}"]`;
+			const option = slide.options.find((o) => o.label === label);
+			if (!option) throw new Error(`${where}: unknown option`);
+			if (!isPlainObject(entry)) throw new Error(`${where} must be { note, pins }`);
+			if (typeof entry.note !== "string") throw new Error(`${where}.note must be a string`);
+			if (!Array.isArray(entry.pins)) throw new Error(`${where}.pins must be an array`);
+			const pins = entry.pins.map((pin, i) => validatePin(pin, option, `${where}.pins[${i}]`));
+			if (new Set(pins.map((p) => p.id)).size !== pins.length) throw new Error(`${where}.pins ids must be unique`);
+			if (entry.note.trim() === "" && pins.length === 0) throw new Error(`${where} must have a note or pins`);
+			slideOut[label] = { note: entry.note, pins };
+		}
+		if (Object.keys(slideOut).length > 0) out[slideId] = slideOut;
+	}
+	return out;
+}
+
+/** One agent-readable line per pin, e.g. `#2 (image 1, 62%, 18%): logo too small`. */
+export function describePin(option: DeckOption, pin: DeckPin, index: number): string {
+	const where = pin.target === "image"
+		? `image ${(option.previewBlocks ?? []).slice(0, pin.blockIndex + 1).filter((b) => b.type === "image").length}`
+		: "preview";
+	return `#${index + 1} (${where}, ${Math.round(pin.x * 100)}%, ${Math.round(pin.y * 100)}%): ${pin.text}`;
+}
+
 export interface SavedDeckData {
 	config: DeckConfig;
 	selections: Record<string, string>;
@@ -232,7 +312,7 @@ export interface SavedDeckData {
 	id?: string;
 	status?: "submitted" | "in-progress" | "cancelled";
 	modifiedAt?: string;
-	notes?: Record<string, string>;
+	notes?: DeckNotes;
 	finalNotes?: string;
 	savedFrom?: {
 		cwd: string;
@@ -264,12 +344,7 @@ export function validateSavedDeck(data: unknown): SavedDeckData {
 		}
 	}
 
-	const notes: Record<string, string> = {};
-	if (obj.notes && typeof obj.notes === "object" && !Array.isArray(obj.notes)) {
-		for (const [key, val] of Object.entries(obj.notes as Record<string, unknown>)) {
-			if (typeof val === "string") notes[key] = val;
-		}
-	}
+	const notes = obj.notes === undefined ? {} : validateDeckNotes(obj.notes, config);
 
 	const status =
 		obj.status === "submitted" || obj.status === "in-progress" || obj.status === "cancelled"

@@ -41,20 +41,10 @@ function showSaveToast(message, isError) {
 	saveToastTimer = setTimeout(() => { toast.classList.add("hidden"); saveToastTimer = null; }, 3000);
 }
 
-function buildSelectedNotes() {
-	const notes = {};
-	for (const [slideId, noteData] of Object.entries(optionNotes)) {
-		if (noteData && selections[slideId] === noteData.label && noteData.notes) {
-			notes[slideId] = noteData.notes;
-		}
-	}
-	return notes;
-}
-
 async function saveDeck() {
 	if (isClosed) return;
 	try {
-		const payload = { token: sessionToken, selections, notes: buildSelectedNotes() };
+		const payload = { token: sessionToken, selections, notes: buildFeedbackPayload() };
 		if (finalNotes) payload.finalNotes = finalNotes;
 		const result = await postJson("/save", payload);
 		if (result.ok) {
@@ -93,6 +83,12 @@ function disableDeckInteractions() {
 	document.querySelectorAll(".gen-prompt, .gen-count").forEach((input) => {
 		input.disabled = true;
 	});
+	document.querySelectorAll(".option-feedback-input, .comment-toggle").forEach((el) => {
+		el.disabled = true;
+	});
+	if (popover) closePinPopover();
+	if (commentMode) setCommentMode(false);
+	if (viewer?.dialog.open) viewer.dialog.close();
 	document.querySelectorAll(".model-pill, .model-list-item, .model-default-check").forEach((el) => {
 		el.disabled = true;
 	});
@@ -114,8 +110,7 @@ async function submitDeck() {
 	}
 
 	try {
-		const notes = buildSelectedNotes();
-		const payload = { token: sessionToken, selections, notes };
+		const payload = { token: sessionToken, selections, notes: buildFeedbackPayload() };
 		if (finalNotes) payload.finalNotes = finalNotes;
 		await postJson("/submit", payload);
 		clearSelectionsStorage();
@@ -141,10 +136,6 @@ async function submitDeck() {
 // ─── CONFIRM BAR & CLOSE OVERLAY ─────────────────────────────
 
 let confirmBarTimeout = null;
-
-function hasAnySelections() {
-	return Object.keys(selections).length > 0;
-}
 
 function showConfirmBar() {
 	const bar = document.getElementById("confirm-bar");
@@ -177,7 +168,7 @@ function handleEscape() {
 		return;
 	}
 
-	if (hasAnySelections()) {
+	if (hasAnyInput()) {
 		showConfirmBar();
 		return;
 	}
@@ -311,7 +302,7 @@ function insertGeneratedOption(slideId, option, model) {
 	reapplySelectionAfterInsert(slideElement, slideId);
 	equalizeBlockHeights(slideElement);
 
-	const pick = slideElement.querySelector(".slide-pick");
+	const pick = slideElement.querySelector(".slide-pick-text");
 	if (pick) pick.innerHTML = optionHint(slide.options.length);
 
 	if (current === totalSlides - 1) {
@@ -327,7 +318,10 @@ function replaceSlideOptions(slideId, newOptions) {
 	slide.options = newOptions;
 
 	delete selections[slideId];
-	delete optionNotes[slideId];
+	// Feedback names the replaced options, so it goes with them.
+	delete feedback[slideId];
+	if (popover && popover.card.dataset.slideId === slideId) closePinPopover();
+	if (viewer?.dialog.open && viewer.state?.card.dataset.slideId === slideId) viewer.dialog.close();
 	saveSelectionsToStorage();
 
 	const slideElement = document.querySelector(`.slide[data-id="${CSS.escape(slideId)}"]`);
@@ -360,7 +354,7 @@ function replaceSlideOptions(slideId, newOptions) {
 
 	equalizeBlockHeights(slideElement);
 
-	const pick = slideElement.querySelector(".slide-pick");
+	const pick = slideElement.querySelector(".slide-pick-text");
 	if (pick) pick.innerHTML = optionHint(newOptions.length);
 
 	if (current === totalSlides - 1) {
@@ -646,18 +640,26 @@ function initConfirmBar() {
 }
 
 function initSaveShortcut() {
-	const isMac = navigator.platform.toUpperCase().indexOf("MAC") >= 0;
 	document.querySelectorAll(".mod-key").forEach((el) => {
 		el.textContent = isMac ? "⌘" : "Ctrl";
 	});
 	if (btnSave) {
 		btnSave.addEventListener("click", () => saveDeck());
 	}
-	document.addEventListener("keydown", (e) => {
-		const mod = isMac ? e.metaKey : e.ctrlKey;
-		if (mod && e.key === "s") {
-			e.preventDefault();
+	// These two work everywhere, including inside fields, so feedback can be saved or sent mid-sentence.
+	document.addEventListener("keydown", (event) => {
+		if (event.isComposing || event.keyCode === 229 || !isModKey(event) || event.altKey || event.shiftKey) return;
+		if (event.key.toLowerCase() === "s") {
+			event.preventDefault();
 			saveDeck();
+		} else if (event.key === "Enter") {
+			event.preventDefault();
+			if (isClosed) return;
+			if (popover) closePinPopover();
+			if (viewer?.dialog.open) viewer.dialog.close();
+			// Not ready yet: show the summary, which lists what is still missing.
+			if (slides.every((slide) => !!selections[slide.id])) submitDeck().catch(() => {});
+			else showSlide(totalSlides - 1);
 		}
 	});
 }

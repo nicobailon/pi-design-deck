@@ -19,7 +19,7 @@ import {
 	validateTokenQuery,
 	type SessionEntry,
 } from "./server-utils.ts";
-import { isDeckOption, type DeckConfig, type DeckOption, type PreviewBlock } from "./deck-schema.ts";
+import { isDeckOption, validateDeckNotes, type DeckConfig, type DeckNotes, type DeckOption, type PreviewBlock } from "./deck-schema.ts";
 import { saveGenerateModel } from "./settings.ts";
 
 export interface ModelInfo {
@@ -44,13 +44,13 @@ const PRISM_ASSETS = `<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/
 	<script src="https://cdn.jsdelivr.net/npm/prismjs@1/plugins/autoloader/prism-autoloader.min.js"></script>`;
 
 // CSS modules - concatenated in order
-const CSS_FILES = ["variables", "layout", "preview", "controls"];
+const CSS_FILES = ["variables", "layout", "preview", "controls", "annotate"];
 const DECK_CSS = CSS_FILES
 	.map((name) => readFileSync(join(FORM_DIR, "css", `${name}.css`), "utf-8"))
 	.join("\n");
 
 // JS modules - concatenated in order (core first, session last with init())
-const JS_FILES = ["deck-core", "deck-render", "deck-interact", "deck-session"];
+const JS_FILES = ["deck-core", "deck-render", "deck-annotate", "deck-interact", "deck-session"];
 const DECK_JS = JS_FILES
 	.map((name) => readFileSync(join(FORM_DIR, "js", `${name}.js`), "utf-8"))
 	.join("\n");
@@ -152,7 +152,7 @@ function saveDeckSnapshot(
 	baseDir: string,
 	options?: {
 		status?: "submitted" | "in-progress" | "cancelled";
-		notes?: Record<string, string>;
+		notes?: DeckNotes;
 		finalNotes?: string;
 	}
 ): { path: string; relativePath: string } {
@@ -221,7 +221,7 @@ export interface DeckServerOptions {
 	port?: number;
 	theme?: { mode?: string; toggleHotkey?: string };
 	savedSelections?: Record<string, string>;
-	savedNotes?: Record<string, { label: string; notes: string }>;
+	savedNotes?: DeckNotes;
 	savedFinalNotes?: string;
 	snapshotDir?: string;
 	autoSaveOnSubmit?: boolean;
@@ -229,7 +229,7 @@ export interface DeckServerOptions {
 }
 
 export interface DeckServerCallbacks {
-	onSubmit: (selections: Record<string, string>, notes?: Record<string, string>, finalNotes?: string) => void;
+	onSubmit: (selections: Record<string, string>, notes?: DeckNotes, finalNotes?: string) => void;
 	onCancel: (reason?: "user" | "stale" | "aborted") => void;
 	onGenerateMore: (slideId: string, prompt?: string, model?: string, thinking?: string, count?: number) => void;
 	onRegenerateSlide: (slideId: string, prompt?: string, model?: string, thinking?: string) => void;
@@ -275,6 +275,18 @@ export async function startDeckServer(
 	}
 
 	const knownSlideIds = new Set(config.slides.map((s) => s.id));
+
+	// Returns null after answering 400, undefined when the browser sent no feedback.
+	const parseNotes = (value: unknown, res: http.ServerResponse): DeckNotes | undefined | null => {
+		if (value === undefined) return undefined;
+		try {
+			const notes = validateDeckNotes(value, config);
+			return Object.keys(notes).length > 0 ? notes : undefined;
+		} catch (err) {
+			sendJson(res, 400, { ok: false, error: err instanceof Error ? err.message : "Invalid notes payload" });
+			return null;
+		}
+	};
 
 	const sseClients = new Set<http.ServerResponse>();
 	let pendingGenerate: { slideId: string; isRegen: boolean; timer: NodeJS.Timeout } | null = null;
@@ -522,7 +534,8 @@ export async function startDeckServer(
 					sendJson(res, 400, { ok: false, error: "Invalid selections payload" });
 					return;
 				}
-				const notes = toStringMap(payload.notes) ?? undefined;
+				const notes = parseNotes(payload.notes, res);
+				if (notes === null) return;
 				const finalNotes = typeof payload.finalNotes === "string" ? payload.finalNotes.trim() : undefined;
 
 				touchHeartbeat();
@@ -554,7 +567,8 @@ export async function startDeckServer(
 
 				const payload = body as { selections?: unknown; notes?: unknown; finalNotes?: unknown };
 				const selections = toStringMap(payload.selections) ?? {};
-				const notes = toStringMap(payload.notes) ?? undefined;
+				const notes = parseNotes(payload.notes, res);
+				if (notes === null) return;
 				const finalNotes = typeof payload.finalNotes === "string" ? payload.finalNotes.trim() : undefined;
 
 				try {

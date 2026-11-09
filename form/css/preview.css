@@ -59,12 +59,12 @@ code[class*="language-"], pre[class*="language-"] {
    OPTION ASIDE
    ───────────────────────────────────────────────────────────── */
 
-/* Option footer - contains aside + notes */
+/* Option footer - aside, feedback field, pin list */
 .option-footer {
   padding: 12px 14px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
 }
 
 .option-aside {
@@ -79,52 +79,41 @@ code[class*="language-"], pre[class*="language-"] {
   border-radius: 0 4px 4px 0;
 }
 
-/* Option notes input */
-.option-notes {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+/* Feedback field: one per option, grows with its content */
+.option-feedback { display: flex; flex-direction: column; gap: 6px; cursor: default; }
+.option-feedback-head { display: flex; align-items: baseline; gap: 8px; }
+.option-feedback-label {
+  font-size: 12px; font-weight: 600; color: var(--dk-text-label);
+  letter-spacing: 0.1px; cursor: text;
 }
-.option-notes-label {
-  font-size: 9px;
-  font-weight: 500;
-  color: var(--dk-text-hint);
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
-  white-space: nowrap;
-  opacity: 0.6;
-}
-.option-notes-input {
-  flex: 1;
-  padding: 5px 8px;
-  border-radius: 4px;
-  border: 1px dashed rgba(var(--dk-ink),0.12);
-  background: transparent;
-  font-size: 11px;
-  font-family: var(--dk-font-mono);
-  color: var(--dk-text);
+.option-feedback-hint { font-size: 11px; color: var(--dk-text-hint); }
+.option-feedback-input,
+.pin-popover-input {
+  width: 100%;
+  field-sizing: content;
+  min-height: 58px;
+  max-height: 240px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(var(--dk-ink),0.13);
+  background: rgba(var(--dk-ink),0.03);
+  font: 13px/1.5 var(--dk-font);
+  color: var(--dk-text-strong);
   resize: none;
-  min-height: 24px;
-  transition: border-color 0.2s, background 0.2s;
+  overflow-y: auto;
+  transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
 }
-.option-notes-input::placeholder {
-  color: var(--dk-text-placeholder);
-  opacity: 0.4;
-  font-size: 10px;
-}
-.option-notes-input:focus {
+.option-feedback-input::placeholder,
+.pin-popover-input::placeholder { color: var(--dk-text-hint); }
+.option-feedback-input:not(:placeholder-shown) { border-color: rgba(138,190,183,0.35); }
+.option-feedback-input:focus,
+.pin-popover-input:focus {
   outline: none;
-  border-style: solid;
-  border-color: rgba(138,190,183,0.3);
-  background: rgba(var(--dk-ink),0.02);
+  border-color: var(--dk-accent);
+  background: rgba(var(--dk-ink),0.05);
+  box-shadow: 0 0 0 3px rgba(138,190,183,0.16);
 }
-.option.selected .option-notes-input {
-  border-color: rgba(138,190,183,0.2);
-}
-.option-notes-input:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
+.option-feedback-input:disabled { opacity: 0.5; cursor: not-allowed; }
 
 /* ─────────────────────────────────────────────────────────────
    PREVIEW COMPONENT SYSTEM (.pv-* classes for generated mockups)
