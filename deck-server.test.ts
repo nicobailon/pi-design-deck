@@ -1,10 +1,10 @@
 import http from "node:http";
-import { chmodSync, mkdirSync, mkdtempSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { DeckConfig } from "./deck-schema.ts";
-import type { DeckServerHandle, DeckServerOptions } from "./deck-server.ts";
+import type { DeckConfig, DeckNotes } from "./deck-schema.ts";
+import type { DeckServerCallbacks, DeckServerHandle, DeckServerOptions } from "./deck-server.ts";
 
 type RequestResult = {
 	status: number;
@@ -17,6 +17,7 @@ type StartOverrides = Partial<Omit<DeckServerOptions, "config" | "sessionToken" 
 	sessionToken?: string;
 	sessionId?: string;
 	cwd?: string;
+	onSubmit?: DeckServerCallbacks["onSubmit"];
 };
 
 let testHome: string;
@@ -43,6 +44,7 @@ async function startServer(overrides: StartOverrides = {}): Promise<DeckServerHa
 		sessionId = "test-session",
 		cwd = process.cwd(),
 		snapshotDir = join(testHome, "snapshots"),
+		onSubmit = () => {},
 		...options
 	} = overrides;
 	return startDeckServer(
@@ -55,7 +57,7 @@ async function startServer(overrides: StartOverrides = {}): Promise<DeckServerHa
 			snapshotDir,
 		},
 		{
-			onSubmit: () => {},
+			onSubmit,
 			onCancel: () => {},
 			onGenerateMore: () => {},
 			onRegenerateSlide: () => {},
@@ -63,7 +65,7 @@ async function startServer(overrides: StartOverrides = {}): Promise<DeckServerHa
 	);
 }
 
-function request(port: number, path = "/", options: { method?: string; headers?: Record<string, string> } = {}): Promise<RequestResult> {
+function request(port: number, path = "/", options: { method?: string; headers?: Record<string, string>; body?: string } = {}): Promise<RequestResult> {
 	return new Promise((resolve, reject) => {
 		const req = http.request(
 			{
@@ -87,8 +89,12 @@ function request(port: number, path = "/", options: { method?: string; headers?:
 			}
 		);
 		req.on("error", reject);
-		req.end();
+		req.end(options.body);
 	});
+}
+
+function postJson(port: number, path: string, payload: unknown): Promise<RequestResult> {
+	return request(port, path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
 }
 
 beforeEach(() => {
@@ -179,5 +185,71 @@ describe("startDeckServer Moshi discovery", () => {
 
 		const mode = statSync(join(piDir, "deck-sessions.json")).mode & 0o777;
 		expect(mode).toBe(0o600);
+	});
+});
+
+describe("feedback on submit and save", () => {
+	function makeFeedbackDeck(): DeckConfig {
+		const image = join(testHome, "hero.png");
+		writeFileSync(image, "png");
+		return {
+			title: "Feedback",
+			slides: [
+				{
+					id: "hero",
+					title: "Hero",
+					options: [
+						{ label: "Banner", previewBlocks: [{ type: "image", src: image, alt: "Banner" }] },
+						{ label: "Plain", previewHtml: "<div>Plain</div>" },
+					],
+				},
+			],
+		};
+	}
+
+	// Feedback on the unselected option must survive too.
+	const notes: DeckNotes = {
+		hero: {
+			Banner: { note: "Bigger logo", pins: [{ id: "p1", target: "image", blockIndex: 0, x: 0.62, y: 0.18, text: "logo too small" }] },
+			Plain: { note: "", pins: [{ id: "p2", target: "option", blockIndex: -1, x: 0.4, y: 0.1, text: "colors off" }] },
+		},
+	};
+
+	function readSnapshot(dir: string): { notes?: DeckNotes; status?: string } {
+		return JSON.parse(readFileSync(join(dir, "deck.json"), "utf8"));
+	}
+
+	it("/submit hands every option's notes and pins to the agent and the snapshot", async () => {
+		let onSubmit: DeckServerCallbacks["onSubmit"] = () => {};
+		const submitted = new Promise((resolve) => {
+			onSubmit = (selections, submittedNotes) => resolve({ selections, notes: submittedNotes });
+		});
+		handle = await startServer({ config: makeFeedbackDeck(), onSubmit });
+
+		const res = await postJson(handle.port, "/submit", { token: "test-token", selections: { hero: "Banner" }, notes });
+
+		expect(res.status).toBe(200);
+		expect(await submitted).toEqual({ selections: { hero: "Banner" }, notes });
+		const snapshots = join(testHome, "snapshots");
+		const [folder] = readdirSync(snapshots);
+		expect(readSnapshot(join(snapshots, folder!))).toMatchObject({ status: "submitted", notes });
+	});
+
+	it("/save writes notes and pins to deck.json", async () => {
+		handle = await startServer({ config: makeFeedbackDeck() });
+
+		const res = await postJson(handle.port, "/save", { token: "test-token", selections: {}, notes });
+
+		expect(res.status).toBe(200);
+		expect(readSnapshot(JSON.parse(res.body).path).notes).toEqual(notes);
+	});
+
+	it("rejects malformed notes instead of dropping them", async () => {
+		handle = await startServer({ config: makeFeedbackDeck() });
+
+		const res = await postJson(handle.port, "/submit", { token: "test-token", selections: { hero: "Banner" }, notes: { hero: "Bigger logo" } });
+
+		expect(res.status).toBe(400);
+		expect(JSON.parse(res.body).error).toContain("must map option labels");
 	});
 });

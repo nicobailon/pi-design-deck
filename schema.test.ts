@@ -417,6 +417,52 @@ describe("validateSavedDeck", () => {
 		expect(() => validateSavedDeck({ config: "bad" })).toThrow();
 		expect(() => validateSavedDeck({ config: { slides: [] } })).toThrow("non-empty array");
 	});
+
+	describe("notes", () => {
+		const config = {
+			slides: [{
+				id: "hero",
+				title: "Hero",
+				options: [
+					{ label: "Banner", previewBlocks: [{ type: "html", content: "<p>x</p>" }, { type: "image", src: "a.png", alt: "Banner" }] },
+					{ label: "Plain", previewHtml: "<div>B</div>" },
+				],
+			}],
+		};
+		const notes = {
+			hero: {
+				Banner: { note: "Bigger logo", pins: [{ id: "p1", target: "image", blockIndex: 1, x: 0.62, y: 0.18, text: "logo too small" }] },
+				Plain: { note: "", pins: [{ id: "p2", target: "option", blockIndex: -1, x: 0, y: 1, text: "footer" }] },
+			},
+		};
+		const withPin = (pin: Record<string, unknown>) => ({ config, notes: { hero: { Banner: { note: "", pins: [{ id: "p1", target: "image", blockIndex: 1, x: 0.5, y: 0.5, text: "t", ...pin }] } } } });
+
+		it("round-trips notes and pins for selected and unselected options", () => {
+			const saved = validateSavedDeck({ config, selections: { hero: "Banner" }, notes });
+			expect(validateSavedDeck(JSON.parse(JSON.stringify(saved))).notes).toEqual(notes);
+		});
+
+		it("rejects the old one-note-per-slide format", () => {
+			expect(() => validateSavedDeck({ config, notes: { hero: "Bigger logo" } })).toThrow("must map option labels");
+		});
+
+		it("rejects feedback for unknown slides or options", () => {
+			expect(() => validateSavedDeck({ config, notes: { nope: {} } })).toThrow('unknown slide "nope"');
+			expect(() => validateSavedDeck({ config, notes: { hero: { Ghost: { note: "x", pins: [] } } } })).toThrow("unknown option");
+		});
+
+		it("rejects malformed entries and pins", () => {
+			expect(() => validateSavedDeck({ config, notes: { hero: { Plain: { note: "", pins: [] } } } })).toThrow("must have a note or pins");
+			expect(() => validateSavedDeck({ config, notes: { hero: { Plain: { pins: [] } } } })).toThrow(".note must be a string");
+			expect(() => validateSavedDeck(withPin({ x: 1.2 }))).toThrow(".x must be a number from 0 to 1");
+			expect(() => validateSavedDeck(withPin({ y: Number.NaN }))).toThrow(".y must be a number from 0 to 1");
+			expect(() => validateSavedDeck(withPin({ target: "page" }))).toThrow('.target must be "option" or "image"');
+			expect(() => validateSavedDeck(withPin({ blockIndex: 0 }))).toThrow("must point to an image block");
+			expect(() => validateSavedDeck(withPin({ target: "option" }))).toThrow("must be -1 for option pins");
+			expect(() => validateSavedDeck(withPin({ text: "  " }))).toThrow(".text must be a non-empty string");
+			expect(() => validateSavedDeck(withPin({ id: "" }))).toThrow(".id must be a non-empty string");
+		});
+	});
 });
 
 describe("deriveDeckStatusFromFolderName", () => {

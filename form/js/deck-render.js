@@ -118,40 +118,57 @@ function renderCodeBlock(container, code, lang) {
 
 // ─── PREVIEW BLOCKS ──────────────────────────────────────────
 
-function renderPreviewBlocks(preview, blocks) {
+const EXPAND_ICON = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M9.5 2.5h4v4M6.5 13.5h-4v-4M13.5 2.5 9 7M2.5 13.5 7 9" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+function renderPreviewBlocks(preview, blocks, content) {
 	preview.classList.add("preview-blocks");
-	for (const block of blocks) {
+	blocks.forEach((block, blockIndex) => {
 		if (block.type === "html") {
 			const wrapper = createElement("div", "preview-block preview-block-html");
 			wrapper.innerHTML = block.content;
-			preview.appendChild(wrapper);
+			content.appendChild(wrapper);
 		} else if (block.type === "mermaid") {
 			const wrapper = createElement("div", "preview-block preview-block-mermaid");
 			wrapper.tabIndex = -1;
-			preview.appendChild(wrapper);
+			content.appendChild(wrapper);
 			whenMermaidReady(() => renderMermaidBlock(wrapper, block.content, block.theme));
 		} else if (block.type === "code") {
 			const wrapper = createElement("div", "preview-block preview-block-code");
 			renderCodeBlock(wrapper, block.code, block.lang);
-			preview.appendChild(wrapper);
+			content.appendChild(wrapper);
 		} else if (block.type === "image") {
 			const wrapper = createElement("div", "preview-block preview-block-image");
+			// The frame is exactly the image's box, so image pins (x/y fractions) track it at any size.
+			const frame = createElement("div", "image-frame");
+			frame.dataset.blockIndex = String(blockIndex);
 			const img = document.createElement("img");
 			img.src = block.src;
 			img.alt = block.alt;
 			img.loading = "lazy";
 			img.onload = () => { const s = wrapper.closest(".slide"); if (s) equalizeBlockHeights(s); };
-			wrapper.appendChild(img);
+			frame.appendChild(img);
+			frame.appendChild(createElement("div", "pin-layer"));
+			const expand = createElement("button", "image-expand");
+			expand.type = "button";
+			expand.title = "View full size";
+			expand.setAttribute("aria-label", `View full size: ${block.alt}`);
+			expand.innerHTML = EXPAND_ICON;
+			expand.addEventListener("click", (event) => {
+				event.stopPropagation();
+				openImageViewer(expand.closest(".option"), blockIndex);
+			});
+			frame.appendChild(expand);
+			wrapper.appendChild(frame);
 			if (block.caption) {
 				const cap = createElement("div", "preview-block-caption", block.caption);
 				wrapper.appendChild(cap);
 			}
-			preview.appendChild(wrapper);
+			content.appendChild(wrapper);
 		}
-	}
+	});
 }
 
-function applyPreviewHtml(preview, previewHtml) {
+function applyPreviewHtml(preview, previewHtml, content = preview) {
 	if (typeof previewHtml !== "string") return;
 	const trimmed = previewHtml.trim();
 	if (!trimmed) return;
@@ -172,11 +189,11 @@ function applyPreviewHtml(preview, previewHtml) {
 		if (first.style.cssText) {
 			preview.style.cssText = first.style.cssText;
 		}
-		preview.innerHTML = first.innerHTML;
+		content.innerHTML = first.innerHTML;
 		return;
 	}
 
-	preview.innerHTML = previewHtml;
+	content.innerHTML = previewHtml;
 }
 
 // ─── OPTION CARDS ────────────────────────────────────────────
@@ -209,6 +226,7 @@ function createOptionCard(option, slideId, generatedBy) {
 		card.classList.add("option-generated");
 	}
 	card.dataset.value = option.label;
+	card.dataset.slideId = slideId;
 	card.addEventListener("click", () => selectOption(card));
 
 	const check = createElement("div", "option-check");
@@ -234,17 +252,25 @@ function createOptionCard(option, slideId, generatedBy) {
 	card.appendChild(header);
 
 	const preview = createElement("div", "preview");
+	// The surface hugs the content (the subgrid cell may stretch to a taller sibling),
+	// so option pins stay on the same spot of the content across layouts.
+	const surface = createElement("div", "preview-surface");
+	const content = createElement("div", "preview-content");
+	surface.appendChild(content);
+	surface.appendChild(createElement("div", "pin-layer"));
+	preview.appendChild(surface);
 	if (Array.isArray(option.previewBlocks) && option.previewBlocks.length > 0) {
-		renderPreviewBlocks(preview, option.previewBlocks);
+		renderPreviewBlocks(preview, option.previewBlocks, content);
 	} else {
-		applyPreviewHtml(preview, option.previewHtml);
+		applyPreviewHtml(preview, option.previewHtml, content);
 	}
 	card.appendChild(preview);
-	preview.querySelectorAll("a, button, input, select, textarea, pre, [contenteditable]").forEach((el) => {
+	content.querySelectorAll("a, button:not(.image-expand), input, select, textarea, pre, [contenteditable]").forEach((el) => {
 		el.tabIndex = -1;
 	});
+	initPinSurface(card, surface);
 
-	// Footer contains aside (optional) + notes input
+	// Footer: aside (optional), feedback field, pin list
 	const footer = createElement("div", "option-footer");
 
 	if (option.aside) {
@@ -254,37 +280,42 @@ function createOptionCard(option, slideId, generatedBy) {
 		footer.appendChild(aside);
 	}
 
-	// Notes input for user instructions
-	const notesContainer = createElement("div", "option-notes");
-	const notesLabel = createElement("label", "option-notes-label", "Your notes (optional)");
-	const notesInput = createElement("textarea", "option-notes-input");
-	notesInput.placeholder = "Add notes...";
-	notesInput.rows = 1;
-	notesInput.dataset.slideId = slideId;
-	notesInput.dataset.optionLabel = option.label;
-	
-	// Restore saved notes if this option was previously selected with notes
-	if (optionNotes[slideId]?.label === option.label && optionNotes[slideId]?.notes) {
-		notesInput.value = optionNotes[slideId].notes;
-	}
-	
-	notesInput.addEventListener("input", (e) => {
-		const value = e.target.value.trim();
-		if (value) {
-			optionNotes[slideId] = { label: option.label, notes: value };
-		} else if (optionNotes[slideId]?.label === option.label) {
-			delete optionNotes[slideId];
-		}
+	const field = createElement("div", "option-feedback");
+	const fieldId = `feedback-${++feedbackFieldCounter}`;
+	const fieldHead = createElement("div", "option-feedback-head");
+	const fieldLabel = createElement("label", "option-feedback-label", "Feedback");
+	fieldLabel.htmlFor = fieldId;
+	fieldHead.appendChild(fieldLabel);
+	fieldHead.appendChild(createElement("span", "option-feedback-hint", "optional"));
+	field.appendChild(fieldHead);
+
+	const input = createElement("textarea", "option-feedback-input");
+	input.id = fieldId;
+	input.rows = 2;
+	input.placeholder = "What would you change about this option?";
+	input.value = getFeedback(slideId, option.label)?.note || "";
+	input.addEventListener("input", () => {
+		ensureFeedback(slideId, option.label).note = input.value;
+		pruneFeedback(slideId, option.label);
+		autosizeField(input);
 		saveSelectionsToStorage();
 		markDirty();
 	});
-	
-	// Prevent click from bubbling to card (which would select it)
-	notesInput.addEventListener("click", (e) => e.stopPropagation());
-	
-	notesContainer.appendChild(notesLabel);
-	notesContainer.appendChild(notesInput);
-	footer.appendChild(notesContainer);
+	input.addEventListener("keydown", (event) => {
+		if (event.key !== "Escape" || event.isComposing) return;
+		// Escape leaves the field instead of cancelling the deck; focus returns to the card.
+		event.preventDefault();
+		event.stopPropagation();
+		card.focus();
+	});
+	// Typing feedback is not a vote for this option.
+	field.addEventListener("click", (event) => event.stopPropagation());
+	field.appendChild(input);
+	footer.appendChild(field);
+
+	const pinList = createElement("ol", "pin-list");
+	pinList.setAttribute("aria-label", `Comments on ${option.label}`);
+	footer.appendChild(pinList);
 	card.appendChild(footer);
 
 	if (option.description) {
@@ -295,7 +326,19 @@ function createOptionCard(option, slideId, generatedBy) {
 		card.classList.add("selected");
 	}
 
+	renderPins(card);
 	return card;
+}
+
+let feedbackFieldCounter = 0;
+
+// Re-measures everything whose size depends on the active slide's width.
+function refreshActiveSlideLayout() {
+	const activeSlide = document.querySelector(".slide.active");
+	if (!activeSlide) return;
+	equalizeBlockHeights(activeSlide);
+	activeSlide.querySelectorAll(".option-feedback-input").forEach(autosizeField);
+	repositionPinPopover();
 }
 
 function createGenerateBar(slideId) {
@@ -342,6 +385,7 @@ function createGenerateBar(slideId) {
 	input.placeholder = "Optional instructions...";
 	input.setAttribute("aria-label", "Instructions for generated option");
 	input.addEventListener("keydown", (e) => {
+		if (isModKey(e) && (e.key === "Enter" || e.key.toLowerCase() === "s")) return;
 		if (e.key === "Enter") {
 			e.preventDefault();
 			button.click();
@@ -380,8 +424,12 @@ function renderSlides() {
 			section.appendChild(createElement("p", "slide-context", slide.context));
 		}
 
-		const pick = createElement("p", "slide-pick");
-		pick.innerHTML = optionHint(slide.options.length);
+		const pick = createElement("div", "slide-pick");
+		const pickText = createElement("span", "slide-pick-text");
+		pickText.innerHTML = optionHint(slide.options.length);
+		pick.appendChild(pickText);
+		pick.appendChild(createElement("span", "slide-comment-hint", "Click anywhere on a preview or image to pin a comment."));
+		pick.appendChild(createCommentToggle());
 		section.appendChild(pick);
 
 		const options = createElement("div", `options ${optionCountClass(slide.options.length, slide.columns)}`);
@@ -523,14 +571,24 @@ function createSummaryCard(slide) {
 				card.appendChild(aside);
 			}
 		}
+	}
 
-		// Show user notes if present
-		const noteData = optionNotes[slide.id];
-		if (noteData && noteData.label === selectedLabel && noteData.notes) {
-			const notesDisplay = createElement("div", "summary-notes");
-			notesDisplay.innerHTML = `<span class="summary-notes-label">Your notes:</span> ${escapeHtml(noteData.notes)}`;
-			card.appendChild(notesDisplay);
+	const slideFeedback = buildFeedbackPayload()[slide.id] || {};
+	const selectedFeedback = selectedLabel ? slideFeedback[selectedLabel] : null;
+	if (selectedFeedback) {
+		const readout = createElement("div", "summary-notes");
+		readout.appendChild(createElement("span", "summary-notes-label", "Your feedback"));
+		if (selectedFeedback.note) readout.appendChild(createElement("div", "summary-notes-body", selectedFeedback.note));
+		if (selectedFeedback.pins.length > 0) {
+			const list = createElement("ol", "summary-pins");
+			selectedFeedback.pins.forEach((pin) => list.appendChild(createElement("li", "", pin.text)));
+			readout.appendChild(list);
 		}
+		card.appendChild(readout);
+	}
+	const others = Object.keys(slideFeedback).filter((label) => label !== selectedLabel);
+	if (others.length > 0) {
+		card.appendChild(createElement("div", "summary-others", `Also sending feedback on ${others.join(", ")}`));
 	}
 
 	return card;

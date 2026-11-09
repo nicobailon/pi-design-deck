@@ -50,7 +50,7 @@ Images: if `surf` is installed, `surf gemini "<prompt>" --generate-image /tmp/x.
 ## While the deck is open
 
 - **Generate more / regenerate**: the tool's reply names the slide, the count, the exact `add-options` or `replace-options` call, and a `deck_generate` call when the user picked a model. Make that one call, distinct from the options already shown; the user's prompt in the reply is the main direction.
-- **Submit**: the reply lists `slideId: chosen label` plus notes. Build to it.
+- **Submit**: the reply lists `slideId: chosen label`, then feedback on any option the user commented on, picked or not: a note and numbered pins like `#2 (image 1, 62%, 18%): logo too small`, where the position is x%, y% from the top-left of that image or of the whole preview. Build to it, and apply feedback on unpicked options where it fits.
 - **Saved decks**: `action: "list"`, `"open"` with `deckId`, `"export"` to HTML.
 
 ## Look up the rest
