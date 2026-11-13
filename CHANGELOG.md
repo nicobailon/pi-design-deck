@@ -14,6 +14,7 @@
 
 ### Changed
 - The notes field is now a readable feedback box that grows as you type.
+- The "Optional instructions" box for generating more options now wraps long text and grows to show all of it instead of scrolling one line sideways; `Shift+Enter` adds a new line and `Enter` still generates. The final notes box on the summary also grows as you type.
 - Up/Down arrows outside a card scroll the slide instead of switching slides, and plain `Enter` no longer moves to the next slide or submits.
 - Breaking: `notes` in saved `deck.json` files and in the `/submit` and `/save` payloads is now `{ [slideId]: { [optionLabel]: { note, pins } } }`. Saved decks in the old one-note-per-slide format fail to load with a clear error.
 
