@@ -337,7 +337,7 @@ function refreshActiveSlideLayout() {
 	const activeSlide = document.querySelector(".slide.active");
 	if (!activeSlide) return;
 	equalizeBlockHeights(activeSlide);
-	activeSlide.querySelectorAll(".option-feedback-input").forEach(autosizeField);
+	activeSlide.querySelectorAll(".option-feedback-input, .gen-prompt, .final-notes-input").forEach(autosizeField);
 	repositionPinPopover();
 }
 
@@ -379,14 +379,14 @@ function createGenerateBar(slideId) {
 	regenButton.title = "Replace all options with fresh alternatives";
 	regenButton.addEventListener("click", () => regenerateSlide(regenButton, slideId));
 
-	const input = document.createElement("input");
-	input.type = "text";
-	input.className = "gen-prompt";
-	input.placeholder = "Optional instructions...";
+	const input = createElement("textarea", "gen-prompt");
+	input.rows = 1;
+	input.placeholder = "Optional instructions… (Shift+Enter for a new line)";
 	input.setAttribute("aria-label", "Instructions for generated option");
+	input.addEventListener("input", () => autosizeField(input));
 	input.addEventListener("keydown", (e) => {
 		if (isModKey(e) && (e.key === "Enter" || e.key.toLowerCase() === "s")) return;
-		if (e.key === "Enter") {
+		if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
 			e.preventDefault();
 			button.click();
 		}
@@ -477,6 +477,7 @@ function createSummarySlide(index) {
 	finalNotesInput.rows = 2;
 	finalNotesInput.addEventListener("input", (e) => {
 		finalNotes = e.target.value.trim();
+		autosizeField(finalNotesInput);
 		saveSelectionsToStorage();
 		markDirty();
 	});

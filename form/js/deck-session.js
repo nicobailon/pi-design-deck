@@ -494,6 +494,7 @@ async function generateMore(button, slideId, input, countSelect) {
 
 	const prompt = input ? input.value.trim() : "";
 	if (input) input.value = "";
+	if (input) autosizeField(input);
 	
 	const count = countSelect ? parseInt(countSelect.value, 10) || 1 : 1;
 

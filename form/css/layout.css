@@ -335,9 +335,12 @@ body {
   font-size: 13px;
   font-family: inherit;
   color: var(--dk-text);
-  resize: vertical;
+  field-sizing: content;
+  resize: none;
+  overflow-y: auto;
+  line-height: 1.5;
   min-height: 60px;
-  max-height: 120px;
+  max-height: 280px;
   transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
 }
 .final-notes-input::placeholder {
