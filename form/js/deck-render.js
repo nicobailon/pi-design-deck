@@ -227,7 +227,15 @@ function createOptionCard(option, slideId, generatedBy) {
 	}
 	card.dataset.value = option.label;
 	card.dataset.slideId = slideId;
-	card.addEventListener("click", () => selectOption(card));
+	// A drag that starts in the feedback box and ends on the card fires click on the card;
+	// only a press that started outside the box is a vote.
+	let pressInField = false;
+	card.addEventListener("pointerdown", (event) => {
+		pressInField = event.target instanceof Element && !!event.target.closest(".option-feedback");
+	});
+	card.addEventListener("click", () => {
+		if (!pressInField) selectOption(card);
+	});
 
 	const check = createElement("div", "option-check");
 	check.innerHTML = "&#10003;";
@@ -302,7 +310,7 @@ function createOptionCard(option, slideId, generatedBy) {
 		markDirty();
 	});
 	input.addEventListener("keydown", (event) => {
-		if (event.key !== "Escape" || event.isComposing) return;
+		if (event.key !== "Escape" || isImeKey(event)) return;
 		// Escape leaves the field instead of cancelling the deck; focus returns to the card.
 		event.preventDefault();
 		event.stopPropagation();
@@ -310,6 +318,12 @@ function createOptionCard(option, slideId, generatedBy) {
 	});
 	// Typing feedback is not a vote for this option.
 	field.addEventListener("click", (event) => event.stopPropagation());
+	// A press on the field's label or padding would focus the card, where the next keys are shortcuts.
+	field.addEventListener("mousedown", (event) => {
+		if (event.target === input) return;
+		event.preventDefault();
+		input.focus();
+	});
 	field.appendChild(input);
 	footer.appendChild(field);
 
@@ -386,7 +400,7 @@ function createGenerateBar(slideId) {
 	input.addEventListener("input", () => autosizeField(input));
 	input.addEventListener("keydown", (e) => {
 		if (isModKey(e) && (e.key === "Enter" || e.key.toLowerCase() === "s")) return;
-		if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
+		if (e.key === "Enter" && !e.shiftKey && !isImeKey(e)) {
 			e.preventDefault();
 			button.click();
 		}
@@ -483,6 +497,12 @@ function createSummarySlide(index) {
 	});
 	finalNotesContainer.appendChild(finalNotesLabel);
 	finalNotesContainer.appendChild(finalNotesInput);
+	// The gap between label and box belongs to neither; a press there would drop focus to the page.
+	finalNotesContainer.addEventListener("mousedown", (event) => {
+		if (event.target === finalNotesInput) return;
+		event.preventDefault();
+		finalNotesInput.focus();
+	});
 	section.appendChild(finalNotesContainer);
 
 	const submitButton = createElement("button", "btn-generate", "Submit Selections");

@@ -9,6 +9,9 @@
 
 ### Fixed
 - Typing in a note no longer triggers deck shortcuts. Arrow keys used to switch slides, Enter moved on or submitted the deck, digits selected options and Escape opened the cancel bar. Shortcuts now ignore text fields and IME composition; `Cmd/Ctrl+S` and `Cmd/Ctrl+Enter` still work everywhere.
+- Typing no longer slips out of a text field into deck shortcuts. Pressing Enter to generate used to lock the instructions box, which threw your next keystrokes to the page, where a digit picked an option or `C` turned on comment mode. Clicking the label or padding of a feedback box, a pin comment or the final notes box did the same. The box now stays editable while options generate, and those clicks keep the cursor in the text. A real-browser test now checks every text field on each change.
+- Confirming a Japanese or Chinese IME conversion with Enter in the instructions box no longer starts a generation, and Escape to dismiss a candidate no longer leaves the feedback box. Safari and the macOS deck window report those keys differently from Chrome.
+- Drag-selecting text in a feedback box and letting go over the card no longer picks that option.
 - Feedback reaches the agent. Writing a note on one option used to erase the note on another, and notes on options you didn't pick were dropped on submit. Each option now keeps its own feedback, and the agent's result lists every option's note and pins.
 - Escape no longer cancels at once when you've written feedback but haven't picked anything yet; it asks first.
 

@@ -62,10 +62,16 @@ function isModKey(event) {
 	return isMac ? event.metaKey : event.ctrlKey;
 }
 
+// WebKit (Safari, Glimpse's WKWebView) ends composition before the keydown that commits it,
+// so that Enter/Escape arrives with isComposing false and only keyCode 229 marks it as IME input.
+function isImeKey(event) {
+	return event.isComposing || event.keyCode === 229;
+}
+
 // Document-level shortcuts must never fire while the user is typing or composing (IME),
 // or while the image viewer dialog owns the keyboard.
 function isTypingEvent(event) {
-	if (event.isComposing || event.keyCode === 229) return true;
+	if (isImeKey(event)) return true;
 	const target = event.target;
 	if (!(target instanceof Element)) return false;
 	return !!target.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"])');
