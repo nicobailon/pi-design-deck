@@ -2,24 +2,31 @@
 
 ## [Unreleased]
 
-### Added
-- Pinned comments: press `C` (or click Comment) and click anywhere on a preview or image to drop a numbered pin with its own comment. Pins can be dragged, edited and deleted, a numbered list under each card mirrors them, and they stay on the same spot when the window or column layout changes. Clicks in comment mode never trigger the preview's own links or buttons.
-- Full-size image view: a maximize button on each image opens it at full resolution, with scroll or pinch to zoom, drag to pan, the caption and alt text, and pins. Escape or a click outside closes it.
-- `Cmd/Ctrl+Enter` submits the deck from anywhere, including inside a field.
+## [0.6.0] - 2026-11-18
 
-### Fixed
-- Typing in a note no longer triggers deck shortcuts. Arrow keys used to switch slides, Enter moved on or submitted the deck, digits selected options and Escape opened the cancel bar. Shortcuts now ignore text fields and IME composition; `Cmd/Ctrl+S` and `Cmd/Ctrl+Enter` still work everywhere.
-- Typing no longer slips out of a text field into deck shortcuts. Pressing Enter to generate used to lock the instructions box, which threw your next keystrokes to the page, where a digit picked an option or `C` turned on comment mode. Clicking an empty part of a feedback box, a pin comment or the final notes box, such as its padding or the space beside its label, did the same. The box now stays editable while options generate, and those clicks keep the cursor in the text. A real-browser test now checks every text field on each change.
-- Confirming a Japanese or Chinese IME conversion with Enter in the instructions box no longer starts a generation, and Escape to dismiss a candidate no longer leaves the feedback box. Safari and the macOS deck window report those keys differently from Chrome.
-- Drag-selecting text in a feedback box and letting go over the card no longer picks that option.
-- Feedback reaches the agent. Writing a note on one option used to erase the note on another, and notes on options you didn't pick were dropped on submit. Each option now keeps its own feedback, and the agent's result lists every option's note and pins.
-- Escape no longer cancels at once when you've written feedback but haven't picked anything yet; it asks first.
+### Highlights
+- Pin comments anywhere on a preview or image: press `C`, click a spot, and write what you think about that exact part.
+- Every option keeps its own feedback, and the agent now gets all of it, including notes on options you didn't pick.
+- Open any image at full size and zoom or pan to check the details.
+- Typing in a text box never fires deck shortcuts anymore, in Chrome, Safari and the macOS deck window, including with Japanese or Chinese input.
+- Breaking: decks saved by earlier versions won't load. See Changed.
+
+### Added
+- Pinned comments: press `C` (or click Comment) and click anywhere on a preview or image to drop a numbered pin with its own comment. You can drag, edit and delete pins. A numbered list under each card shows them, and they stay on the same spot when the window or column layout changes. Clicks in comment mode never trigger the preview's own links or buttons.
+- Full-size image view: a maximize button on each image opens it at full resolution. Scroll or pinch to zoom, drag to pan, and see the caption, alt text and pins. Escape or a click outside closes it.
+- `Cmd/Ctrl+Enter` submits the deck from anywhere, including inside a text box.
 
 ### Changed
-- The notes field is now a readable feedback box that grows as you type.
-- The "Optional instructions" box for generating more options now wraps long text and grows to show all of it instead of scrolling one line sideways; `Shift+Enter` adds a new line and `Enter` still generates. The final notes box on the summary also grows as you type.
+- The notes field is now a readable feedback box that grows as you type. The "Optional instructions" box for generating more options and the final notes box on the summary also wrap long text and grow instead of scrolling one line sideways. In the instructions box, `Shift+Enter` adds a new line and `Enter` still generates.
 - Up/Down arrows outside a card scroll the slide instead of switching slides, and plain `Enter` no longer moves to the next slide or submits.
-- Breaking: `notes` in saved `deck.json` files and in the `/submit` and `/save` payloads is now `{ [slideId]: { [optionLabel]: { note, pins } } }`. Saved decks in the old one-note-per-slide format fail to load with a clear error.
+- Breaking: notes are now stored per option, with each option's note and pins. This changes `notes` in saved `deck.json` files and in the `/submit` and `/save` payloads to `{ [slideId]: { [optionLabel]: { note, pins } } }`. Decks saved in the old one-note-per-slide format fail to load with an error that says why.
+
+### Fixed
+- Feedback now reaches the agent. Writing a note on one option used to erase the note on another, and notes on options you didn't pick were dropped on submit.
+- Typing in a text box no longer triggers deck shortcuts. Arrow keys used to switch slides, Enter moved on or submitted the deck, digits picked options, `C` turned on comment mode and Escape opened the cancel bar. This also happened right after pressing Enter to generate, and after clicking an empty part of a text box, such as its padding or the space beside its label. `Cmd/Ctrl+S` and `Cmd/Ctrl+Enter` still work everywhere.
+- With a Japanese or Chinese input method, confirming a conversion with Enter no longer starts a generation, and pressing Escape to dismiss a candidate no longer kicks you out of the feedback box. Safari and the macOS deck window report those keys differently from Chrome.
+- Drag-selecting text in a feedback box and letting go over the card no longer picks that option.
+- Escape no longer cancels right away when you've written feedback but haven't picked anything yet; it asks first.
 
 ## [0.5.2] - 2026-10-27
 
