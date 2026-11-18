@@ -302,7 +302,7 @@ function openPinPopover(card, pinId) {
 	});
 	input.addEventListener("keydown", (event) => {
 		// Cmd/Ctrl combos (save, submit) belong to the document shortcuts.
-		if (event.isComposing || event.keyCode === 229 || isModKey(event)) return;
+		if (isImeKey(event) || isModKey(event)) return;
 		if (event.key === "Enter" && !event.shiftKey) {
 			event.preventDefault();
 			event.stopPropagation();
@@ -320,6 +320,12 @@ function openPinPopover(card, pinId) {
 	});
 	done.addEventListener("click", () => closePinPopover({ focusMarker: true }));
 	el.addEventListener("click", (event) => event.stopPropagation());
+	// A press on the popover's title or padding would move focus to the page, where keys are shortcuts.
+	el.addEventListener("mousedown", (event) => {
+		if (event.target instanceof Element && event.target.closest("textarea, button")) return;
+		event.preventDefault();
+		input.focus();
+	});
 
 	(inViewer ? viewer.dialog : document.body).appendChild(el);
 	popover = { el, card, pinId, inViewer };

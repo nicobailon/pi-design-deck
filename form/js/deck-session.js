@@ -266,7 +266,6 @@ function restoreGenerateButton(slideId) {
 	if (plus) plus.textContent = "+";
 	pending.button.lastChild.textContent = "Generate";
 	
-	if (pending.input && !isClosed) pending.input.disabled = false;
 	if (pending.countSelect && !isClosed) pending.countSelect.disabled = false;
 
 	pendingGenerate.delete(slideId);
@@ -511,7 +510,8 @@ async function generateMore(button, slideId, input, countSelect) {
 	const plus = button.querySelector(".btn-gen-plus");
 	if (plus) plus.textContent = "";
 	button.lastChild.textContent = "Generating...";
-	if (input) input.disabled = true;
+	// The instructions box stays editable: disabling a focused field drops focus to the page,
+	// where the user's next keystrokes would fire deck shortcuts.
 	if (countSelect) countSelect.disabled = true;
 
 	// Set timeout for generation (30s per option)
@@ -528,7 +528,7 @@ async function generateMore(button, slideId, input, countSelect) {
 		}
 	}, 30000 * count);
 
-	pendingGenerate.set(slideId, { button, skeletons, input, countSelect, model: selectedModel || null, expectedCount: count, receivedCount: 0, timeoutId });
+	pendingGenerate.set(slideId, { button, skeletons, countSelect, model: selectedModel || null, expectedCount: count, receivedCount: 0, timeoutId });
 
 	try {
 		const body = { token: sessionToken, slideId, count };
@@ -558,6 +558,7 @@ async function regenerateSlide(button, slideId) {
 	const input = genRow ? genRow.querySelector(".gen-prompt") : null;
 	const prompt = input ? input.value.trim() : "";
 	if (input) input.value = "";
+	if (input) autosizeField(input);
 
 	// Create skeleton overlay with centered spinner
 	const optionCount = slide.options?.length || 2;
@@ -580,12 +581,11 @@ async function regenerateSlide(button, slideId) {
 	button.classList.add("loading");
 	button.disabled = true;
 	button.textContent = "↻ Regenerating...";
-	if (input) input.disabled = true;
 
 	const genMoreBtn = slideElement.querySelector(".btn-gen-more");
 	if (genMoreBtn) genMoreBtn.disabled = true;
 
-	pendingGenerate.set(slideId, { button, originalText, input, isRegen: true, optionsGrid, genMoreBtn, overlay });
+	pendingGenerate.set(slideId, { button, originalText, isRegen: true, optionsGrid, genMoreBtn, overlay });
 
 	try {
 		const body = { token: sessionToken, slideId };
@@ -605,13 +605,12 @@ function restoreRegenButton(slideId) {
 	if (!pending || !pending.isRegen) return;
 	pendingGenerate.delete(slideId);
 
-	const { button, originalText, input, optionsGrid, genMoreBtn, overlay } = pending;
+	const { button, originalText, optionsGrid, genMoreBtn, overlay } = pending;
 	if (button) {
 		button.classList.remove("loading");
 		button.disabled = false;
 		button.textContent = originalText || "↻ Regenerate all";
 	}
-	if (input) input.disabled = false;
 	if (optionsGrid) {
 		optionsGrid.classList.remove("regenerating");
 		optionsGrid.style.position = "";
@@ -649,7 +648,7 @@ function initSaveShortcut() {
 	}
 	// These two work everywhere, including inside fields, so feedback can be saved or sent mid-sentence.
 	document.addEventListener("keydown", (event) => {
-		if (event.isComposing || event.keyCode === 229 || !isModKey(event) || event.altKey || event.shiftKey) return;
+		if (isImeKey(event) || !isModKey(event) || event.altKey || event.shiftKey) return;
 		if (event.key.toLowerCase() === "s") {
 			event.preventDefault();
 			saveDeck();
